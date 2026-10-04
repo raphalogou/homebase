@@ -37,7 +37,7 @@ export function Sheet({
         >
           <div
             aria-hidden="true"
-            className="mx-auto mt-2.5 mb-3 h-1 w-10 shrink-0 rounded-full bg-dashed"
+            className="mx-auto mt-2.5 mb-3 h-1 w-10 shrink-0 rounded-full bg-border-strong"
           />
           <Dialog.Title
             className={

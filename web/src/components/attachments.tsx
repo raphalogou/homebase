@@ -157,7 +157,7 @@ export function Attachments({
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={cn(
-            "mt-3 grid min-h-20 w-full place-items-center rounded-[12px] border border-dashed [border-color:var(--dashed)] px-4 text-sm text-muted-foreground",
+            "mt-3 grid min-h-20 w-full place-items-center rounded-[12px] border border-dashed border-border-strong px-4 text-sm text-muted-foreground",
             dragging && "bg-soft",
           )}
         >

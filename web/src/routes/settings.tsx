@@ -12,6 +12,7 @@ import { useData } from "@/data/provider";
 import { useAccount, useServerSettings, useSessions, useSettingsActions } from "@/data/settings";
 import type { AccountInfo, SessionInfo } from "@/data/types";
 import { changedOn } from "@/lib/dates";
+import { getTheme, setTheme, type Theme } from "@/lib/theme";
 import { labelFromUA } from "@/lib/ua";
 
 function ago(ms: number): string {
@@ -65,6 +66,7 @@ function TimeAndWeek({ run }: { run: Run }) {
   const weekStart = useWeekStart();
   const actions = useSettingsActions();
   const id = useId();
+  const [theme, setThemeState] = useState<Theme>(getTheme);
   const tz = store.me?.tz ?? "UTC";
   const zones = useMemo(() => {
     const all = Intl.supportedValuesOf("timeZone");
@@ -108,6 +110,24 @@ function TimeAndWeek({ run }: { run: Run }) {
             ]}
             onChange={(v) => void run(() => actions.saveTime(tz, v === "1" ? 1 : 0))}
           />
+        </div>
+        <div>
+          <span className="mb-2 block text-sm font-semibold text-muted-foreground">Theme</span>
+          <Segmented<Theme>
+            label="Theme"
+            className="max-w-sm"
+            value={theme}
+            options={[
+              { value: "system", label: "System" },
+              { value: "light", label: "Light" },
+              { value: "dark", label: "Dark" },
+            ]}
+            onChange={(v) => {
+              setTheme(v);
+              setThemeState(v);
+            }}
+          />
+          <p className="mt-1.5 text-[13px] text-muted-foreground">On this device only.</p>
         </div>
       </div>
     </section>

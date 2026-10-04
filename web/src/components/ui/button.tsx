@@ -9,11 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "rounded-lg bg-ink text-field",
+        primary: "rounded-lg bg-ink text-bg",
         secondary: "rounded-lg border border-ink bg-field text-ink",
         text: "min-h-11 px-1 text-ink underline underline-offset-[3px]",
-        chip: "h-11 rounded-[22px] border border-line bg-field px-4 text-sm text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-field",
-        small: "h-11 rounded-md border border-line bg-field px-3.5 text-sm text-ink",
+        chip: "h-11 rounded-[22px] border border-border-strong bg-field px-4 text-sm text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-field",
+        small: "h-11 rounded-md border border-border-strong bg-field px-3.5 text-sm text-ink",
         icon: "size-11 rounded-md text-ink",
       },
       size: {

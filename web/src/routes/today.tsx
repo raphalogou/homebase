@@ -35,7 +35,7 @@ import { useIsDesktop } from "@/lib/use-media";
 
 const SLOT_TEXT = ["Choose your three", "Choose a second", "Choose a third"];
 const slotClass =
-  "flex min-h-16 w-full items-center rounded-[12px] border border-dashed [border-color:var(--dashed)] px-4 text-left font-medium text-muted-foreground";
+  "flex min-h-16 w-full items-center rounded-[12px] border border-dashed border-border-strong px-4 text-left font-medium text-muted-foreground";
 
 export default function Today() {
   const today = useToday();
@@ -240,7 +240,7 @@ function ReviewLink() {
   return (
     <Link
       to="/review"
-      className="flex min-h-16 items-center gap-3 rounded-[12px] border border-line bg-field px-4"
+      className="flex min-h-16 items-center gap-3 rounded-[12px] border border-border-strong bg-field px-4"
     >
       <ReviewIcon size={20} className="shrink-0" />
       <span className="min-w-0 flex-1">
