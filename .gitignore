@@ -1,0 +1,20 @@
+# Secrets and user data
+.env
+.env.*
+/data/
+*.pem
+vapid*.json
+
+# Build output
+/bin/
+/web/dist/
+/server/internal/webui/dist/*
+!/server/internal/webui/dist/.gitkeep
+
+# Dependencies
+node_modules/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/

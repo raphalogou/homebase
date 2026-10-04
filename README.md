@@ -28,20 +28,20 @@ A calm personal planner for goals, projects and tasks, built to be opened every 
 ## Stack
 
 - **Server:** Go, standard library HTTP, SQLite (`modernc.org/sqlite`, no CGO). One binary with the web app embedded.
-- **Web:** React, TypeScript, React Router, Tailwind CSS, shadcn/ui, IndexedDB for the offline copy, a service worker for offline use and push.
+- **Web:** React 19, TypeScript, React Router, Tailwind CSS v4, shadcn/ui, IndexedDB for the offline copy, a service worker for offline use and push.
 
-## Planned quick start
+## Quick start
 
-These commands will work once Phase 0 of `PLAN.md` is done.
+Requires Go 1.22 or newer, Node 22.18 or newer, and `make`.
 
 ```sh
-# development: Go server and Vite dev server together
+# development: Go server and Vite dev server together, open http://localhost:5173
 make dev
 
 # tests
 make test
 
-# production build: web app embedded in a single binary
+# production build: web app embedded in a single binary at bin/homebase
 make build
 ```
 

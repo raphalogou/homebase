@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: nothing is built yet. The repository holds only these documents.
+Status: Phase 0 done.
 
 ## Decisions already made
 
@@ -16,13 +16,22 @@ Status: nothing is built yet. The repository holds only these documents.
 
 ## Phase 0: bootstrap
 
-- [ ] Create the layout from `AGENTS.md` (`server/`, `web/`, `deploy/`).
-- [ ] `server/`: `go mod init`, `cmd/homebase/main.go` serving `/healthz`, config from environment, `slog` logging.
-- [ ] `web/`: Vite + React + TypeScript (strict), React Router, Tailwind, shadcn/ui initialised, `@fontsource` fonts installed.
-- [ ] `Makefile` targets: `dev`, `build`, `test`, `lint`.
-- [ ] CI-equivalent script that runs the Go tests, `go vet`, the web type check, lint and unit tests.
+- [x] Create the layout from `AGENTS.md` (`server/`, `web/`, `deploy/`).
+- [x] `server/`: `go mod init`, `cmd/homebase/main.go` serving `/healthz`, config from environment, `slog` logging.
+- [x] `web/`: Vite + React + TypeScript (strict), React Router, Tailwind, shadcn/ui initialised, `@fontsource` fonts installed.
+- [x] `Makefile` targets: `dev`, `build`, `test`, `lint`.
+- [x] CI-equivalent script (`make ci`) that runs the Go tests, `go vet`, the web type check, lint and unit tests.
 
 **Done when:** `make dev` serves the web app with API calls proxied to the Go server, and `make test` passes.
+
+Notes:
+
+- With the owner's approval the stack moved to React 19 and Tailwind v4, because current shadcn/ui components no longer use `forwardRef` and break refs on React 18. Lint and formatting use Biome; web unit tests use `node --test` (Node strips TypeScript types itself), so there is no extra test dependency. Test files import siblings with the `.ts` extension.
+- The built web app is embedded from `server/internal/webui/dist`, because `go:embed` cannot reach `web/dist`. `make build` copies it there; the folder is ignored except a placeholder, so a plain `go build` still compiles and answers with a hint.
+- `/healthz` and an unknown `/api/*` route (JSON `not_found`) exist. Request logs redact `/calendar/` paths, since the path is the secret.
+- Go compiled first time on Go 1.26 with `go 1.22` in `go.mod`.
+- `HOMEBASE_PASSPHRASE_HASH` is not read yet; Phase 1 adds it with auth.
+- `components.json` names lucide as the shadcn icon library. `DESIGN.md` wants inline SVG icons, so replace lucide imports in added components, or ask before installing `lucide-react`.
 
 ## Phase 1: foundation (server)
 
