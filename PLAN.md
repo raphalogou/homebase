@@ -149,7 +149,7 @@ Notes:
 
 ## Phase 6: polish
 
-Designed by the owner (the Phase 6 addendum, now merged into `DESIGN.md`; the drawings are in `mockups/`).
+Designed by the owner (the Phase 6 addendum, now merged into `DESIGN.md`).
 
 - [x] Account: a username besides the passphrase, a first-run Set up screen, and changing either from Settings (`0002_account.sql`, `docs/SPEC.md` sections 2, 4 and 7).
 - [x] Dark theme, with the light contrast fixes (`--muted`, the new `--border`).
