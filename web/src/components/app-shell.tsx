@@ -5,7 +5,9 @@ import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 import { GoalsIcon, InboxIcon, PlanIcon, TodayIcon } from "./icons";
+import { PickDialog } from "./pick-dialog";
 import { TaskPanel, TaskSheet } from "./task-editor";
+import { Toaster } from "./toaster";
 
 interface NavItem {
   to: string;
@@ -113,6 +115,8 @@ export function AppShell() {
       </nav>
 
       <TaskSheet />
+      <PickDialog />
+      <Toaster />
     </div>
   );
 }
@@ -132,19 +136,21 @@ export function Columns({ main, side, capture = false }: ColumnsProps) {
   const [id] = useOpenTask();
   const task = useTask(id);
   const right = desktop ? task ? <TaskPanel /> : side : null;
+  // The regions fill the window; only the content inside the main column is
+  // capped, so lines stay short however wide the screen.
   return (
     <div className="min-[1100px]:flex">
       <main
         className={cn(
-          "w-full max-w-[780px] min-w-0 flex-1 px-6 pt-5 min-[900px]:px-14 min-[900px]:pt-12 min-[900px]:pb-16",
+          "min-w-0 flex-1 px-6 pt-5 min-[900px]:px-14 min-[900px]:pt-12 min-[900px]:pb-16",
           capture ? "pb-[168px]" : "pb-[104px]",
         )}
       >
-        {main}
+        <div className="mx-auto w-full max-w-[780px]">{main}</div>
       </main>
       {right && (
-        <aside className="border-line px-6 pb-16 min-[900px]:px-14 min-[1100px]:sticky min-[1100px]:top-0 min-[1100px]:max-h-dvh min-[1100px]:w-[360px] min-[1100px]:shrink-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l min-[1100px]:px-8 min-[1100px]:pt-12">
-          {right}
+        <aside className="border-line px-6 pb-16 min-[900px]:px-14 min-[1100px]:sticky min-[1100px]:top-0 min-[1100px]:h-dvh min-[1100px]:w-[360px] min-[1100px]:shrink-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l min-[1100px]:px-8 min-[1100px]:pt-12">
+          <div className="mx-auto w-full max-w-[780px] min-[1100px]:max-w-none">{right}</div>
         </aside>
       )}
     </div>

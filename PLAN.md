@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 to 2 done.
+Status: Phases 0 to 3 done.
 
 ## Decisions already made
 
@@ -85,16 +85,27 @@ Notes:
 
 ## Phase 3: goals, projects, attachments
 
-- [ ] Goals list and goal detail (projects, tasks, notes, links).
-- [ ] Plan, Projects: grouped by goal, add a project.
-- [ ] Project detail: tasks, notes (saved on pause), attachments.
-- [ ] Link and note attachments through sync.
-- [ ] `POST /api/files`, `GET /api/files/{sha}`, upload UI (button and desktop drop area), orphan clean-up job, serving headers from section 6.
-- [ ] Delete flows that ask: delete with contents or keep tasks standalone.
+- [x] Goals list and goal detail (projects, tasks, notes, links).
+- [x] Plan, Projects: grouped by goal, add a project.
+- [x] Project detail: tasks, notes (saved on pause), attachments.
+- [x] Link and note attachments through sync.
+- [x] `POST /api/files`, `GET /api/files/{sha}`, upload UI (button and desktop drop area), orphan clean-up job, serving headers from section 6.
+- [x] Delete flows that ask: delete with contents or keep tasks standalone.
 
 **Tests required:** upload size limit; same file twice stores once; hostile file served as download with `nosniff`; attachment owner check (exactly one owner).
 
 **Done when:** a project with notes, a link, a note and two files survives a reload and shows on a second device.
+
+Notes:
+
+- Verified in headless Chromium (ungoogled-chromium 153, over the DevTools protocol) against the built binary. A goal was created through the new field, then a project under it, two tasks, notes, a link, a note, and a PDF and a PNG uploaded through the file input. All of it survived a reload and appeared on a second, fresh browser; the PDF downloaded there with its type. Chrome reported no installability errors (`Page.getInstallabilityErrors`), which also covers the Phase 2 check that Lighthouse no longer offers.
+- Approved designs, now recorded in `DESIGN.md`: the "New goal" field under the Goals list (pulled forward from Phase 6) and the delete question as a sheet or dialog.
+- Uploads need a connection; offline the button says so. Links and notes work offline like any other row. Before uploading to a goal or project made offline, the outbox is sent first so the server knows the owner.
+- File types and sizes in attachment rows come from a `HEAD` request, because the attachment row carries neither. Offline they show as the file's extension.
+- Deleting shows the server's cascade at once on the device; the server's own rows replace it at the next sync.
+- Found in testing: an add field cleared itself after saving, wiping anything typed meanwhile. Fields now clear on submit.
+
+Changes after review (approved by the owner): toasts with Undo and Open; the picker as a modal; a week strip with previous and next weeks and clickable days; icons with counts on the Projects list; clearer Inbox verbs; Lucide for all icons; "Change" and "Remove from today" to take tasks off today; regions that fill the window. Found while testing: Base UI keeps toasts past the limit (marked `limited`) unless the renderer skips them; promote now shows its result at once instead of waiting for a sync.
 
 ## Phase 4: reminders and push
 
@@ -124,7 +135,7 @@ These were never drawn. Design them in the same style as `DESIGN.md` and show th
 - [ ] Dark theme (tokens are proposed in `DESIGN.md`; check contrast).
 - [ ] Empty, loading and error states for every screen.
 - [ ] Offline and sync-failed indicator.
-- [ ] Phone Projects list, goal creation, and the repeat picker.
+- [ ] Phone Projects list, goal creation, and the repeat picker. (Phone Projects list and goal creation done in Phase 3.)
 - [ ] Keyboard shortcuts on desktop (capture, switch screens).
 - [ ] Accessibility pass: focus order, screen reader labels, reduced motion.
 

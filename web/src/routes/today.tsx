@@ -1,11 +1,12 @@
-import { type RefObject, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Columns } from "@/components/app-shell";
 import { CaptureBar } from "@/components/capture-bar";
 import { GoalLine, Progress } from "@/components/goal-line";
+import { NoticeIcon, PlannedIcon } from "@/components/icons";
 import { InstallButton } from "@/components/install-button";
 import { Empty, ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
 import { useTaskMeta } from "@/components/task-row";
+import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { WeekStrip } from "@/components/week-strip";
 import { YourThree } from "@/components/your-three";
@@ -21,6 +22,7 @@ import {
 } from "@/data/hooks";
 import type { Task } from "@/data/types";
 import { longDate } from "@/lib/dates";
+import { useOpenPick } from "@/lib/open-pick";
 import { useIsDesktop } from "@/lib/use-media";
 
 const SLOT_TEXT = ["Choose your three", "Choose a second", "Choose a third"];
@@ -34,7 +36,8 @@ export default function Today() {
   const progress = useGoalProgress();
   const actions = useActions();
   const desktop = useIsDesktop();
-  const suggestionsRef = useRef<HTMLHeadingElement>(null);
+  const [, setPick] = useOpenPick();
+  const navigate = useNavigate();
   const room = planned.length < MAX_PER_DAY;
 
   const main = (
@@ -58,7 +61,13 @@ export default function Today() {
       )}
 
       <section aria-labelledby="three-heading" className="mt-10">
-        <SectionHeading id="three-heading">Your three</SectionHeading>
+        <div className="flex items-baseline justify-between gap-4">
+          <SectionHeading id="three-heading">Your three</SectionHeading>
+          {/* Always reachable, so a full day can still be changed. */}
+          <Button variant="text" aria-label="Change your three" onClick={() => setPick(true)}>
+            Change
+          </Button>
+        </div>
         <YourThree
           tasks={planned}
           grip={desktop}
@@ -67,22 +76,9 @@ export default function Today() {
         />
         {room && (
           <div className={planned.length > 0 ? "border-t border-line pt-3" : ""}>
-            {desktop ? (
-              <button
-                type="button"
-                className={slotClass}
-                onClick={() => {
-                  suggestionsRef.current?.scrollIntoView({ block: "start" });
-                  suggestionsRef.current?.focus();
-                }}
-              >
-                {SLOT_TEXT[planned.length]}
-              </button>
-            ) : (
-              <Link to="/pick" className={slotClass}>
-                {SLOT_TEXT[planned.length]}
-              </Link>
-            )}
+            <button type="button" className={slotClass} onClick={() => setPick(true)}>
+              {SLOT_TEXT[planned.length]}
+            </button>
           </div>
         )}
       </section>
@@ -109,13 +105,15 @@ export default function Today() {
             {goals.map((g) => {
               const p = progress(g.id);
               return (
-                <li key={g.id} className="border-t border-line py-3">
-                  <p className="font-serif text-[19px]/[1.25]">{g.title}</p>
-                  <Progress
-                    done={p.done}
-                    total={p.total}
-                    label={`${g.title}: ${p.done} of ${p.total} done`}
-                  />
+                <li key={g.id} className="border-t border-line">
+                  <Link to={`/goals/${g.id}`} className="block py-3">
+                    <span className="block font-serif text-[19px]/[1.25]">{g.title}</span>
+                    <Progress
+                      done={p.done}
+                      total={p.total}
+                      label={`${g.title}: ${p.done} of ${p.total} done`}
+                    />
+                  </Link>
                 </li>
               );
             })}
@@ -124,22 +122,16 @@ export default function Today() {
       </section>
       <section aria-labelledby="side-week" className="mt-10">
         <SectionLabel id="side-week">This week</SectionLabel>
-        <WeekStrip selected={today} />
+        <WeekStrip selected={null} onSelect={(d) => d && navigate(`/plan?day=${d}`)} />
       </section>
-      <Suggestions headingRef={suggestionsRef} room={room} />
+      <Suggestions room={room} />
     </>
   );
 
   return <Columns main={main} side={side} capture={!desktop} />;
 }
 
-function Suggestions({
-  headingRef,
-  room,
-}: {
-  headingRef: RefObject<HTMLHeadingElement | null>;
-  room: boolean;
-}) {
+function Suggestions({ room }: { room: boolean }) {
   const s = useSuggestions();
   const groups: [string, Task[]][] = [
     ["Due soon", s.dueSoon],
@@ -149,12 +141,7 @@ function Suggestions({
   const any = groups.some(([, list]) => list.length > 0);
   return (
     <section aria-labelledby="suggest-heading" className="mt-10">
-      <h2
-        id="suggest-heading"
-        ref={headingRef}
-        tabIndex={-1}
-        className="mb-1 text-[22px] font-bold"
-      >
+      <h2 id="suggest-heading" className="mb-1 text-[22px] font-bold">
         Choose up to three
       </h2>
       {!room && (
@@ -183,13 +170,12 @@ function SuggestionRow({ task, room }: { task: Task; room: boolean }) {
   const actions = useActions();
   const today = useToday();
   const meta = useTaskMeta()(task);
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
   return (
     <li className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-[17px]/[1.3] font-medium">{task.title}</p>
         {meta && <p className="mt-0.5 text-[13px] text-muted-foreground">{meta}</p>}
-        {message && <p className="mt-0.5 text-[13px]">{message}</p>}
       </div>
       <Button
         variant="small"
@@ -198,8 +184,9 @@ function SuggestionRow({ task, room }: { task: Task; room: boolean }) {
         onClick={async () => {
           try {
             await actions.plan(task.id, today);
+            notify({ title: `Planned for today: ${task.title}`, icon: PlannedIcon });
           } catch (err) {
-            if (err instanceof ActionError) setMessage(err.message);
+            if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
             else throw err;
           }
         }}

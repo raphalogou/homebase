@@ -11,6 +11,7 @@ import {
   todayIn,
   weekday,
   weekOf,
+  weekRange,
 } from "./dates.ts";
 
 test("todayIn uses the given zone, not the machine's", () => {
@@ -88,4 +89,9 @@ test("isDate", () => {
   assert.equal(isDate("2026-02-28"), true);
   assert.equal(isDate("2026-02-30"), false);
   assert.equal(isDate("2026-2-28"), false);
+});
+
+test("weekRange", () => {
+  assert.equal(weekRange("2026-10-05"), "5 – 11 October");
+  assert.equal(weekRange("2026-09-28"), "28 September – 4 October");
 });

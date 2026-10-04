@@ -21,7 +21,7 @@ import type { Goal, LocalDate, Project, Repeat, Task } from "./types.ts";
 
 export { MAX_PER_DAY } from "./rules.ts";
 
-function useVersion(): number {
+export function useVersion(): number {
   const { store } = useData();
   return useSyncExternalStore(store.subscribe, store.getVersion);
 }
@@ -216,8 +216,11 @@ export function useActions() {
 
       plan,
 
-      async unplan(id: string) {
+      /** Takes a task off its day; the returned function puts it back. */
+      async unplan(id: string): Promise<() => Promise<void>> {
+        const before = store.snapshot([{ table: "tasks", id }]);
         await update(id, { plannedOn: null, planRank: null });
+        return () => store.restore(before);
       },
 
       /** Makes ids today's open picks, in order. Done picks stay where they are. */
@@ -267,8 +270,15 @@ export function useActions() {
         if (t.repeatId !== repeatId) await update(id, { repeatId });
       },
 
-      async remove(id: string) {
+      /** Deletes a task and its attachments; the returned function undoes it. */
+      async remove(id: string): Promise<() => Promise<void>> {
+        const atts = live(store.tables.attachments.values()).filter((a) => a.taskId === id);
+        const before = store.snapshot([
+          { table: "tasks", id },
+          ...atts.map((a) => ({ table: "attachments" as const, id: a.id })),
+        ]);
         await store.remove("tasks", id);
+        return () => store.restore(before);
       },
 
       /**
@@ -281,7 +291,18 @@ export function useActions() {
         if (store.outbox.size === 0) {
           try {
             const res = await api.promote(id, goalId);
-            await engine.run();
+            // Show the result at once: a sync already under way would not
+            // include it, and the next one brings the server's own rows.
+            const at = Date.now();
+            await store.anticipate("projects", [res.project]);
+            await store.anticipate("tasks", [{ ...t, deletedAt: at }]);
+            await store.anticipate(
+              "attachments",
+              live(store.tables.attachments.values())
+                .filter((a) => a.taskId === id)
+                .map((a) => ({ ...a, taskId: null, projectId: res.project.id })),
+            );
+            void engine.run();
             return res.project.id;
           } catch (err) {
             if (!(err instanceof NetworkError)) throw err;

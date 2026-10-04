@@ -1,5 +1,7 @@
 import { type FormEvent, useId, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { Columns } from "@/components/app-shell";
+import { CheckIcon, NoticeIcon } from "@/components/icons";
 import { Empty, ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
 import {
   ParentOptions,
@@ -9,13 +11,15 @@ import {
   repeatOptions,
 } from "@/components/task-editor";
 import { TaskRow } from "@/components/task-row";
+import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import { WeekStrip } from "@/components/week-strip";
 import { ActionError, useActions, useTasks, useToday, useWeekStart } from "@/data/hooks";
 import { dayOf } from "@/data/rules";
 import type { LocalDate, Task } from "@/data/types";
-import { addDays, dayHeading, startOfWeek } from "@/lib/dates";
+import { addDays, dayHeading, isDate, longDate, startOfWeek } from "@/lib/dates";
 
 type Filter = "all" | "week" | "standalone" | "repeating";
 
@@ -37,8 +41,21 @@ export default function Plan() {
   const today = useToday();
   const weekStart = useWeekStart();
   const actions = useActions();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("all");
-  const [day, setDay] = useState<LocalDate | null>(null);
+  const [params, setParams] = useSearchParams();
+  const dayParam = params.get("day");
+  const day: LocalDate | null = dayParam && isDate(dayParam) ? dayParam : null;
+  const setDay = (d: LocalDate | null) =>
+    setParams(
+      (p) => {
+        const copy = new URLSearchParams(p);
+        if (d) copy.set("day", d);
+        else copy.delete("day");
+        return copy;
+      },
+      { replace: true },
+    );
 
   const groups = useMemo(() => {
     const weekEnd = addDays(startOfWeek(today, weekStart), 6);
@@ -85,6 +102,16 @@ export default function Plan() {
   const main = (
     <>
       <ScreenTitle>Plan</ScreenTitle>
+      <Segmented
+        label="Show"
+        className="mt-6 max-w-80"
+        value="tasks"
+        options={[
+          { value: "tasks", label: "Tasks" },
+          { value: "projects", label: "Projects" },
+        ]}
+        onChange={(v) => v === "projects" && navigate("/plan/projects")}
+      />
       <div className="mt-6">
         <WeekStrip selected={day} onSelect={setDay} />
       </div>
@@ -102,6 +129,14 @@ export default function Plan() {
         ))}
       </fieldset>
 
+      {day && (
+        <div className="mt-6 flex items-baseline justify-between gap-4">
+          <h2 className="text-[22px] font-bold">{longDate(day)}</h2>
+          <Button variant="text" onClick={() => setDay(null)}>
+            Show all
+          </Button>
+        </div>
+      )}
       <div className="mt-6">
         {groups.length === 0 && (
           <Empty>
@@ -134,11 +169,10 @@ function NewTaskForm() {
   const [parent, setParent] = useState("");
   const [day, setDay] = useState("");
   const [repeat, setRepeat] = useState<RepeatChoice>("none");
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setMessage("");
     try {
       await actions.addTask({
         title,
@@ -149,9 +183,9 @@ function NewTaskForm() {
       setTitle("");
       setDay("");
       setRepeat("none");
-      setMessage("Task added.");
+      notify({ title: `Added “${title.trim()}”`, icon: CheckIcon });
     } catch (err) {
-      if (err instanceof ActionError) setMessage(err.message);
+      if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
       else throw err;
     }
   }
@@ -200,9 +234,6 @@ function NewTaskForm() {
           </Select>
         </div>
         <Button type="submit">Add task</Button>
-        <p className="text-sm" role="status">
-          {message}
-        </p>
       </form>
     </section>
   );

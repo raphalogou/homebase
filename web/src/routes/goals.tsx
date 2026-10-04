@@ -1,27 +1,31 @@
+import { AddField } from "@/components/add-field";
 import { Columns } from "@/components/app-shell";
-import { GoalLine } from "@/components/goal-line";
+import { GoalList } from "@/components/goal-list";
 import { Empty, ScreenTitle } from "@/components/section";
-import { useGoalProgress, useOpenGoals } from "@/data/hooks";
+import { useOpenGoals } from "@/data/hooks";
+import { useStructureActions } from "@/data/structure";
 
-// The list only; goal detail and projects come in PLAN.md Phase 3.
 export default function Goals() {
   const goals = useOpenGoals();
-  const progress = useGoalProgress();
+  const actions = useStructureActions();
   return (
     <Columns
       main={
         <>
           <ScreenTitle>Goals</ScreenTitle>
           <div className="mt-8">
-            {goals.length === 0 ? (
-              <Empty>No goals yet.</Empty>
-            ) : (
-              <ul>
-                {goals.map((g) => (
-                  <GoalLine key={g.id} goal={g} {...progress(g.id)} />
-                ))}
-              </ul>
-            )}
+            {goals.length === 0 ? <Empty>No goals yet. Write one below.</Empty> : <GoalList />}
+          </div>
+          {/* Approved design: the new goal field sits under the list, in the serif. */}
+          <div className="mt-10">
+            <AddField
+              label="New goal"
+              showLabel
+              serif
+              placeholder="A statement of intent"
+              button="Add"
+              onAdd={(title) => actions.addGoal(title)}
+            />
           </div>
         </>
       }

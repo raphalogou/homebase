@@ -86,7 +86,7 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 - Radii: inputs and large buttons 12; chips 22 (fully round); small buttons and icon boxes 10; segmented control 12 (track) and 9 (active segment); the lifted drag row 12.
 - Touch targets: 44 px minimum, including the checkbox (a 26 px circle inside a 44 px button), grip handle, close buttons and nav items.
 - Shadow: only on the row being dragged (`0 8px 24px rgba(20,25,24,.16)`) and the active segment (`0 1px 2px rgba(20,25,24,.14)`).
-- Icons: 24 px (20 in rails and buttons), 1.8 px stroke, round caps, drawn inline as SVG. No icon font, no emoji.
+- Icons: Lucide (`lucide-react`), 24 px (20 in rails and buttons, 18 in chips and toasts, 16 in meta lines), 1.8 px stroke, round caps, inline SVG. No icon font, no emoji.
 
 ## Layout
 
@@ -99,23 +99,25 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 
 ### Desktop (900 px and wider)
 
-- Three regions: left rail (200 to 240 px), main column, optional right column (300 to 380 px) separated by hairlines.
+- Three regions: left rail (200 to 240 px), main column, optional right column (300 to 380 px) separated by hairlines. The regions fill the window: the main column takes the space between rail and right column, and its content is capped (see Type) and centred in it; the right column sits at the window's right edge with a full-height hairline.
 - Rail: wordmark, then Today, Inbox, Plan, Goals, Weekly review; Reminders at the bottom. The active item has the `--soft` fill and a 600 label.
 - Below about 1100 px the right column drops under the main column. Below 900 px the rail becomes the phone tab bar.
 - Forms ("New task", "Add a project") live in the right column as plain labelled fields, not modals.
 
 ## Components
 
+- **Task panel (desktop):** closes, and `?task` leaves the URL, as soon as its task is marked done, whether from a list's checkbox or its own Status. A task that is already done still opens.
 - **Task row:** checkbox, title (marked if planned for today), a meta line (project or goal, due text such as "Today", "Tomorrow", "Friday", "2d overdue", repeat note, attachment count). Tapping the row opens the task; tapping the checkbox toggles done.
-- **Your three:** up to three rows, each with a rank number. Desktop adds a grip handle on the left; the row being dragged is lifted (field fill, shadow). Phone reorders by long-press drag, with up and down buttons in the task sheet. An empty slot is a dashed row, "Choose a third".
+- **Your three:** up to three rows, each with a rank number. An open task planned for today has a "Remove from today" button in its sheet or panel; done tasks keep their slot. Desktop adds a grip handle on the left; the row being dragged is lifted (field fill, shadow). Phone reorders by long-press drag, with up and down buttons in the task sheet. An empty slot is a dashed row, "Choose a third".
 - **Goal line:** serif text with a one-line meta under it ("5 of 12 tasks done"). Goal detail adds a 4 px progress line (`--line` track, `--ink` fill).
 - **Segmented control:** two or three buttons in a `--soft` track (Tasks and Projects; Keep, Pause and Drop in the weekly review, where the chosen option fills with ink).
-- **Week strip:** seven equal cells showing a weekday letter, the date, and up to three small ink dots for how much is planned or due. The selected day uses `--soft-day`. Weeks start on Monday by default.
+- **Week strip:** seven equal cells showing a weekday letter, the date, and up to three small ink dots for how much is planned or due. The selected day uses `--soft-day`. Weeks start on Monday by default. Approved: previous and next arrows either side of the range ("5 – 11 October"); away from this week the range is a text button back to it. Tapping a day on Plan filters the list (`/plan?day=…`) under the day's name with "Show all"; on Today's side column it opens Plan on that day.
 - **Filter chips:** round, 44 px tall; the selected chip is filled with ink and light text.
 - **Attachment row:** a 44 px icon box (note, link, file, image), a title, a one-line meta ("PDF, 240 KB"), and a remove button. Beneath the list: "Add link", "Add note", "Upload file". Desktop adds a dashed drop area.
 - **Toggle:** 52 by 32 px; ink track when on.
 - **Buttons:** primary is ink fill with light text, 52 px tall, radius 12; secondary is a 1 px ink outline; text buttons are 600 weight with an underline offset of 3 px. No arrows appended to labels.
 - **Inputs:** `--field` fill, 1 px `--line` border, radius 12, 48 px tall, always with a visible or screen-reader label. Focus shows a 2 px ink outline with 2 px offset.
+- **Toast:** approved. An ink bar with light text, an 18 px icon, one line, radius 12, at most five stacked, 4 s (6 s with an action). Phone: above the tab bar, or above the capture bar where there is one. Desktop: bottom left of the main column. It confirms what leaves the screen (captured, planned, made a project, uploaded, deleted) and says why something was refused (day full, upload failed). Removing from today and every delete offer Undo; making a project offers Open. Never red.
 - **Notification preview:** dark card, a rounded square with a bold "H" carrying the highlighter, app name and time, a 600 title and a body.
 
 ## Screens
@@ -123,15 +125,16 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 | Screen | Route | Contents |
 | --- | --- | --- |
 | Today | `/` | Date and "Today"; Goals (all open goals as serif lines); Your three; capture bar. Desktop right column: goals with progress, this week strip, review link. Review link appears from Friday until done. |
-| Choose up to three | `/pick` (phone), inline suggestions on desktop | Groups: Due soon, In progress, Moved a few times. Tick tasks; button "Set today (2 chosen)". |
-| Inbox | `/inbox` | "Captured, not yet placed". Each item has Today, Date, Goal and Project buttons. Desktop shows today's three alongside. |
+| Choose up to three | A modal over the current screen (`?pick=1`; `/pick` redirects): a bottom sheet on the phone, a centred dialog on desktop; desktop also keeps the inline suggestions. Reached from the dashed slot and from a "Change" text link beside "Your three", which shows even when the day is full. Unticking removes a task from today. | Groups: Due soon, In progress, Moved a few times. Tick tasks; button "Set today (2 chosen)". |
+| Inbox | `/inbox` | "Captured, not yet placed". Approved: each item has the done checkbox before its title (ticking it says "Done" in a toast with Undo, since a done task leaves the Inbox) and chips with an icon and a verb, "Do today", "Pick a day", "Add to a goal" and "Make it a project", wrapping to two rows on the phone. Desktop shows today's three alongside. |
 | Plan, Tasks | `/plan` | Tasks and Projects switch; week strip; chips Everything, Due this week, Standalone, Repeating; tasks grouped by day, then Repeating. Desktop adds a "New task" form (task, goal, plan for, repeat). |
-| Plan, Projects | `/plan/projects` | Projects grouped under their goal with a progress line and the next task. Desktop adds "Add a project". Not drawn on the phone: build it from the desktop version. |
+| Plan, Projects | `/plan/projects` | Projects grouped under their goal with a progress line and the next task. Approved: a flag before each goal heading, a folder before each project, and a meta line of icons with counts (tasks done, attachments, "Notes" when it has notes). Desktop adds "Add a project". On the phone it is the desktop list in one column. |
 | Project | `/projects/:id` | Title, progress, Tasks with an add field, Notes (editable), Attachments. |
 | Goal | `/goals/:id` | Serif title, progress, Projects, Tasks on their own, Notes, Links. Desktop shows the goal list on the left. |
+| Goals | `/goals` | Goal lines, then the approved "New goal" field under the list: a labelled field in the serif (placeholder "A statement of intent") and an ink "Add" button. |
 | Weekly review | `/review` | One-sentence summary in serif; "Gone quiet" with Keep, Pause, Drop; "Next week" shows a goal with nothing done and "Plan a task"; button "Finish review". |
 | Reminders | `/reminders` | Three slots (time, on or off, kind, description); devices; "Send a test now". |
-| Login | `/login` | Not drawn. One passphrase field and a primary button, in the same style. |
+| Login | `/login` | Approved: the same top-aligned column as other screens. Highlighted wordmark, 36 px "Log in", one muted sentence, a labelled passphrase field, a full-width primary "Log in". A wrong passphrase shows a plain ink sentence under the field. |
 
 ## Copy
 
@@ -154,4 +157,6 @@ None, except: the bottom sheet slide (180 ms), the lift of a dragged row, and fo
 
 ## Not designed yet
 
-Dark theme, empty, loading and error states, the offline indicator, the phone Projects list, goal creation, the repeat picker, the login screen. Design these in this style and show the owner before building.
+Dark theme, empty, loading and error states, the offline indicator and the repeat picker. Design these in this style and show the owner before building.
+
+Approved since: the login screen and goal creation (see Screens); the phone Projects list is the desktop list in one column. Deleting a goal or project asks first: a bottom sheet on the phone, a small centred dialog (radius 20) on desktop, with the title "Delete “Name”?", one sentence of counts ("It has 4 tasks and 2 attachments."), the primary "Keep tasks, delete project", the secondary "Delete project and tasks", and a text "Cancel". With nothing inside, one primary "Delete project".

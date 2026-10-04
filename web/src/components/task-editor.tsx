@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ActionError,
   useActions,
@@ -14,7 +14,8 @@ import { live } from "@/data/rules";
 import type { Repeat, Task, TaskStatus } from "@/data/types";
 import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
-import { CloseIcon, DownIcon, UpIcon } from "./icons";
+import { CloseIcon, DeleteIcon, DownIcon, NoticeIcon, UnplannedIcon, UpIcon } from "./icons";
+import { useNotify } from "./toaster";
 import { Button } from "./ui/button";
 import { Input, Label, Select, Textarea } from "./ui/input";
 import { Segmented } from "./ui/segmented";
@@ -91,7 +92,7 @@ function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
   const planned = usePlanned(today);
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes);
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
   const id = useId();
 
   // Another device may change the task while it is open.
@@ -99,11 +100,10 @@ function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
   useEffect(() => setNotes(task.notes), [task.notes]);
 
   async function run(fn: () => Promise<unknown>) {
-    setMessage("");
     try {
       await fn();
     } catch (err) {
-      if (err instanceof ActionError) setMessage(err.message);
+      if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
       else throw err;
     }
   }
@@ -188,17 +188,32 @@ function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
           />
         </div>
       </div>
-      {message && (
-        <p className="-mt-2 text-sm" role="status">
-          {message}
-        </p>
-      )}
 
-      {!desktop && rank >= 0 && planned.length > 1 && (
-        <div className="flex items-center gap-2">
+      {rank >= 0 && task.status === "open" && (
+        <div className="flex flex-wrap items-center gap-2">
           <span className="mr-auto text-sm font-semibold text-muted-foreground">
             Number {rank + 1} of today's {planned.length}
           </span>
+          <Button
+            variant="small"
+            onClick={() =>
+              void run(async () => {
+                const undo = await actions.unplan(task.id);
+                notify({
+                  title: "Removed from today",
+                  icon: UnplannedIcon,
+                  action: { label: "Undo", run: () => void undo().catch(() => {}) },
+                });
+              })
+            }
+          >
+            Remove from today
+          </Button>
+        </div>
+      )}
+
+      {!desktop && rank >= 0 && planned.length > 1 && (
+        <div className="flex items-center justify-end gap-2">
           <Button
             variant="small"
             aria-label="Move up"
@@ -269,7 +284,13 @@ function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
           variant="text"
           onClick={() =>
             void run(async () => {
-              await actions.remove(task.id);
+              const title = task.title;
+              const undo = await actions.remove(task.id);
+              notify({
+                title: `Deleted “${title}”`,
+                icon: DeleteIcon,
+                action: { label: "Undo", run: () => void undo() },
+              });
               onClose();
             })
           }
@@ -307,6 +328,18 @@ export function TaskSheet() {
 export function TaskPanel() {
   const [id, open] = useOpenTask();
   const task = useTask(id);
+  const seen = useRef<{ id: string; status: TaskStatus } | null>(null);
+
+  // Once the open task is done there is nothing left to edit: close the panel
+  // (and drop ?task from the URL). Opening a task that is already done is fine.
+  useEffect(() => {
+    const before = seen.current;
+    if (task && before?.id === task.id && before.status !== "done" && task.status === "done") {
+      open(null);
+    }
+    seen.current = task ? { id: task.id, status: task.status } : null;
+  }, [task, open]);
+
   if (!task) return null;
   return (
     <section aria-labelledby="task-panel-title">

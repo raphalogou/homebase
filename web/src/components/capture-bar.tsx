@@ -1,6 +1,8 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useActions } from "@/data/hooks";
 import { cn } from "@/lib/utils";
+import { InboxIcon } from "./icons";
+import { useNotify } from "./toaster";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -9,19 +11,37 @@ import { Input } from "./ui/input";
 export function CaptureBar({ fixed = false }: { fixed?: boolean }) {
   const actions = useActions();
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState("");
+  const notify = useNotify();
   const id = useId();
+  const form = useRef<HTMLFormElement>(null);
+
+  // On the phone the bar sits where toasts appear; lift them above it.
+  useEffect(() => {
+    const el = form.current;
+    if (!fixed || !el) return;
+    const root = document.documentElement;
+    const lift = () => root.style.setProperty("--toast-lift", `${el.offsetHeight}px`);
+    lift();
+    const ro = new ResizeObserver(lift);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--toast-lift");
+    };
+  }, [fixed]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    await actions.addTask({ title });
+    const value = title;
     setTitle("");
-    setStatus("Added to Inbox.");
+    await actions.addTask({ title: value });
+    notify({ title: `Added to Inbox: ${value.trim()}`, icon: InboxIcon });
   }
 
   return (
     <form
+      ref={form}
       onSubmit={submit}
       className={cn(
         "flex gap-2",
@@ -37,7 +57,6 @@ export function CaptureBar({ fixed = false }: { fixed?: boolean }) {
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
-          setStatus("");
         }}
         placeholder="Capture a task"
         maxLength={300}
@@ -52,9 +71,6 @@ export function CaptureBar({ fixed = false }: { fixed?: boolean }) {
       >
         Add
       </Button>
-      <p className="sr-only" aria-live="polite">
-        {status}
-      </p>
     </form>
   );
 }

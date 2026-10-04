@@ -98,3 +98,11 @@ export function dayHeading(date: LocalDate, today: LocalDate): string {
   if (d === -1) return "Yesterday";
   return fmt(date, { weekday: "long", day: "numeric", month: "long" });
 }
+
+/** "6 – 12 October", or "28 September – 4 October" across months. */
+export function weekRange(first: LocalDate): string {
+  const last = addDays(first, 6);
+  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
+  const from = fmt(first, sameMonth ? { day: "numeric" } : { day: "numeric", month: "long" });
+  return `${from} – ${fmt(last, { day: "numeric", month: "long" })}`;
+}

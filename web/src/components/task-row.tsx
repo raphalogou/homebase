@@ -7,12 +7,12 @@ import { cn } from "@/lib/utils";
 import { DoneBox } from "./checkbox";
 
 /** Project or goal, due text, repeat note: the line under a task's title. */
-export function useTaskMeta(): (t: Task) => string {
+export function useTaskMeta(): (t: Task, showContext?: boolean) => string {
   const contextOf = useContextOf();
   const today = useToday();
-  return (t: Task) => {
+  return (t: Task, showContext = true) => {
     const parts: string[] = [];
-    const why = contextOf(t);
+    const why = showContext ? contextOf(t) : null;
     if (why) parts.push(why);
     if (t.due && t.status === "open") parts.push(dueText(t.due, today));
     if (t.repeatId) parts.push("Repeats");
@@ -44,13 +44,15 @@ interface TaskRowProps {
   /** After the title: buttons such as "Today". */
   trail?: ReactNode;
   className?: string;
+  /** Leave out the project or goal, on that project's or goal's own page. */
+  hideContext?: boolean;
 }
 
 // DESIGN.md "Task row": at least 64 px, a hairline above, no box. Tapping the
 // title opens the task; the checkbox toggles done.
-export function TaskRow({ task, onToggle, lead, trail, className }: TaskRowProps) {
+export function TaskRow({ task, onToggle, lead, trail, className, hideContext }: TaskRowProps) {
   const today = useToday();
-  const meta = useTaskMeta()(task);
+  const meta = useTaskMeta()(task, !hideContext);
   const [, open] = useOpenTask();
   return (
     <div className={cn("flex min-h-16 items-center gap-3 border-t border-line py-2.5", className)}>

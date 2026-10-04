@@ -14,6 +14,8 @@ import {
 import type { Changes, Me, Op, Reminder, RowOf, SyncTable } from "./types.ts";
 
 type Tables = { [K in SyncTable]: Map<string, RowOf[K]> };
+type SnapshotRow = { [K in SyncTable]: { table: K; row: RowOf[K] } }[SyncTable];
+export type Snapshot = SnapshotRow[];
 
 export class LocalStore {
   readonly tables: Tables = {
@@ -28,6 +30,9 @@ export class LocalStore {
   rev = 0;
   me: Me | null = null;
   signedIn = false;
+
+  /** Type and size of uploaded files, learned from the server, by SHA. */
+  fileMeta = new Map<string, { type: string; size: number } | null>();
 
   /** Bumped on every change; hooks re-read when it moves. */
   version = 0;
@@ -110,6 +115,47 @@ export class LocalStore {
       tx.done,
     ]);
     this.onWrite();
+  }
+
+  /**
+   * Shows a change the server will make anyway, such as a cascade, without
+   * queueing it. The server's own rows replace it on the next sync.
+   */
+  async anticipate<K extends SyncTable>(table: K, rows: RowOf[K][]): Promise<void> {
+    if (rows.length === 0) return;
+    const tx = this.db.transaction(table, "readwrite");
+    const store = tx.store as unknown as { put(v: unknown): Promise<unknown> };
+    for (const r of rows) this.tables[table].set(r.id, r);
+    await Promise.all([...rows.map((r) => store.put(r)), tx.done]);
+    this.changed();
+  }
+
+  setFileMeta(sha: string, meta: { type: string; size: number } | null): void {
+    this.fileMeta.set(sha, meta);
+    this.changed();
+  }
+
+  /** Copies of rows as they are now, to put back on Undo. */
+  snapshot(rows: { table: SyncTable; id: string }[]): Snapshot {
+    const out: Snapshot = [];
+    for (const { table, id } of rows) {
+      const row = this.tables[table].get(id);
+      if (row) out.push({ table, row: { ...row } } as SnapshotRow);
+    }
+    return out;
+  }
+
+  /**
+   * Writes a snapshot back as new edits, parents before children. Being
+   * later than the change it undoes, it wins on every device.
+   */
+  async restore(snap: Snapshot): Promise<void> {
+    const order: SyncTable[] = ["goals", "projects", "repeats", "tasks", "attachments"];
+    for (const table of order) {
+      for (const s of snap) {
+        if (s.table === table) await this.put(table, s.row as RowOf[typeof table]);
+      }
+    }
   }
 
   /** Outbox entries in the order they were made. */

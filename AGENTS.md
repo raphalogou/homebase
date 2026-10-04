@@ -18,7 +18,7 @@ Homebase is a personal planner for one person, used on an Android phone and a co
 ## Stack (fixed; do not swap)
 
 - **Server:** Go 1.26 or newer (required by `modernc.org/sqlite`), standard library `net/http` with method patterns, `modernc.org/sqlite`, `log/slog`. Extra modules only when unavoidable (`golang.org/x/crypto` for argon2id, optionally a Web Push library). No web framework, no ORM.
-- **Web:** React 19, TypeScript with `strict`, React Router (library mode), Tailwind CSS v4, shadcn/ui components built on Base UI (`@base-ui/react`, not Radix), `idb` for IndexedDB, `vite-plugin-pwa` in `injectManifest` mode. Fonts through `@fontsource`.
+- **Web:** React 19, TypeScript with `strict`, React Router (library mode), Tailwind CSS v4, shadcn/ui components built on Base UI (`@base-ui/react`, not Radix), Lucide icons (`lucide-react`), `idb` for IndexedDB, `vite-plugin-pwa` in `injectManifest` mode. Fonts through `@fontsource`.
 - **Tooling:** Vite, Biome for web lint and formatting, the Node built-in test runner (`node --test`) for web unit tests, `gofmt` and `go vet` for Go.
 - **Deploy:** one Go binary that embeds the built web app, one data folder, HTTPS in front (Caddy or Tailscale).
 

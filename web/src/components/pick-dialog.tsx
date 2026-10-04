@@ -1,10 +1,5 @@
+import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { Columns } from "@/components/app-shell";
-import { CheckIcon } from "@/components/icons";
-import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
-import { useTaskMeta } from "@/components/task-row";
-import { Button } from "@/components/ui/button";
 import {
   ActionError,
   MAX_PER_DAY,
@@ -14,16 +9,51 @@ import {
   useToday,
 } from "@/data/hooks";
 import type { Task } from "@/data/types";
+import { useOpenPick } from "@/lib/open-pick";
+import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
+import { CheckIcon, NoticeIcon, PlannedIcon } from "./icons";
+import { Empty, SectionLabel } from "./section";
+import { useTaskMeta } from "./task-row";
+import { useNotify } from "./toaster";
+import { Button } from "./ui/button";
+import { Sheet } from "./ui/sheet";
 
-// Phone only in the design; on desktop the same choices sit beside Today.
-export default function Pick() {
+const TITLE = "Choose up to three";
+
+// "Pickers and edit forms open as a bottom sheet" (DESIGN.md); on desktop the
+// same picker is a centred dialog.
+export function PickDialog() {
+  const [open, setOpen] = useOpenPick();
+  const desktop = useIsDesktop();
+  if (!desktop) {
+    return (
+      <Sheet open={open} onOpenChange={setOpen} title={TITLE} showTitle>
+        <PickBody onDone={() => setOpen(false)} />
+      </Sheet>
+    );
+  }
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => setOpen(o)}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/30" />
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[85dvh] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[20px] bg-bg px-8 pt-8">
+          <Dialog.Title className="mb-1 text-[26px]/[1.2] font-bold">{TITLE}</Dialog.Title>
+          <div className="-mx-8 overflow-y-auto px-8">
+            <PickBody onDone={() => setOpen(false)} />
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function PickBody({ onDone }: { onDone: () => void }) {
   const today = useToday();
   const planned = usePlanned(today);
   const s = useSuggestions();
   const actions = useActions();
-  const navigate = useNavigate();
-  const [message, setMessage] = useState("");
+  const notify = useNotify();
 
   const done = planned.filter((t) => t.status === "done");
   const current = planned.filter((t) => t.status === "open");
@@ -47,36 +77,32 @@ export default function Pick() {
   async function save() {
     try {
       await actions.setToday(chosen);
-      navigate("/");
+      notify({
+        title: chosen.length ? "Today is set" : "Nothing planned for today",
+        icon: PlannedIcon,
+      });
+      onDone();
     } catch (err) {
-      if (err instanceof ActionError) setMessage(err.message);
+      if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
       else throw err;
     }
   }
 
-  const main = (
-    <>
-      <Link
-        to="/"
-        className="inline-flex min-h-11 items-center font-semibold underline underline-offset-[3px]"
-      >
-        Today
-      </Link>
-      <ScreenTitle className="mt-2">Choose up to three</ScreenTitle>
-      <p className="mt-2 text-muted-foreground">
+  return (
+    <div>
+      <p className="text-muted-foreground">
         {done.length > 0
           ? `${done.length} done already, so ${max === 1 ? "one more fits" : `${max} more fit`}.`
-          : "Pick what matters most today."}
+          : "Pick what matters most today. Untick one to take it off."}
       </p>
-
       {!any && (
-        <div className="mt-8">
+        <div className="mt-6">
           <Empty>Nothing to choose from yet. Capture a task first.</Empty>
         </div>
       )}
       {groups.map(([label, list]) =>
         list.length === 0 ? null : (
-          <section key={label} className="mt-8" aria-label={label}>
+          <section key={label} className="mt-6" aria-label={label}>
             <SectionLabel>{label}</SectionLabel>
             <ul>
               {list.map((t) => (
@@ -92,21 +118,13 @@ export default function Pick() {
           </section>
         ),
       )}
-
-      <div className="fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 border-t border-line bg-bg px-6 py-3 min-[900px]:static min-[900px]:mt-10 min-[900px]:border-0 min-[900px]:p-0">
-        {message && (
-          <p className="mb-2 text-sm" role="status">
-            {message}
-          </p>
-        )}
-        <Button className="w-full min-[900px]:w-auto" onClick={() => void save()}>
+      <div className="sticky bottom-0 -mx-8 mt-6 border-t border-line bg-bg px-8 py-4 max-[899px]:-mx-6 max-[899px]:px-6">
+        <Button className="w-full" onClick={() => void save()}>
           Set today ({chosen.length} chosen)
         </Button>
       </div>
-    </>
+    </div>
   );
-
-  return <Columns main={main} capture />;
 }
 
 function PickRow({

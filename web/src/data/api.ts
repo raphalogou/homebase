@@ -1,7 +1,7 @@
 // The only module that talks to the server. Components use the hooks in
 // this folder instead.
 
-import type { Me, Op, Project, PullResult, PushResult } from "./types.ts";
+import type { Attachment, Me, Op, Project, PullResult, PushResult } from "./types.ts";
 
 /** An error answer from the server, with the code from docs/SPEC.md. */
 export class ApiError extends Error {
@@ -55,6 +55,33 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+async function upload(form: FormData) {
+  let res: Response;
+  try {
+    res = await fetch("/api/files", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-Homebase": "1" },
+      body: form,
+    });
+  } catch (err) {
+    throw new NetworkError(err);
+  }
+  const data = (await res.json().catch(() => null)) as
+    | (Attachment & { error?: undefined })
+    | { error?: { code?: string; message?: string } }
+    | null;
+  if (!res.ok || !data) {
+    const e = data?.error;
+    throw new ApiError(
+      res.status,
+      e?.code ?? "unknown",
+      e?.message ?? "The upload did not finish.",
+    );
+  }
+  return data as Attachment;
+}
+
 export const api = {
   login: (passphrase: string) => request<void>("POST", "/api/login", { passphrase }),
   logout: () => request<void>("POST", "/api/logout"),
@@ -62,6 +89,30 @@ export const api = {
   pull: (since: number, limit = 500) =>
     request<PullResult>("GET", `/api/sync?since=${since}&limit=${limit}`),
   push: (base: number, ops: Op[]) => request<PushResult>("POST", "/api/sync", { base, ops }),
+  /** Uploads a file to a goal, project or task. Fields go first, then the file. */
+  upload: (ownerKind: "goal" | "project" | "task", ownerId: string, file: File) => {
+    const form = new FormData();
+    form.append("ownerKind", ownerKind);
+    form.append("ownerId", ownerId);
+    form.append("name", file.name);
+    form.append("file", file);
+    return upload(form);
+  },
+  /** Type and size of a stored file, from its headers; null if it is gone. */
+  fileMeta: async (sha: string): Promise<{ type: string; size: number } | null> => {
+    let res: Response;
+    try {
+      res = await fetch(`/api/files/${sha}`, { method: "HEAD", credentials: "same-origin" });
+    } catch (err) {
+      throw new NetworkError(err);
+    }
+    if (!res.ok) return null;
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    return {
+      type: disposition.startsWith("inline") ? (res.headers.get("Content-Type") ?? "") : "",
+      size: Number(res.headers.get("Content-Length") ?? 0),
+    };
+  },
   promote: (taskId: string, goalId: string | null) =>
     request<{ project: Project; removedTaskId: string }>(
       "POST",

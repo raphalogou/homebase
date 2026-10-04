@@ -1,8 +1,20 @@
 import { useId, useState } from "react";
+import { useNavigate } from "react-router";
 import { Columns } from "@/components/app-shell";
 import { CaptureBar } from "@/components/capture-bar";
+import { DoneBox } from "@/components/checkbox";
+import {
+  CheckIcon,
+  GoalsIcon,
+  MakeProjectIcon,
+  NoticeIcon,
+  PlanIcon,
+  PlannedIcon,
+  TodayIcon,
+} from "@/components/icons";
 import { Empty, ScreenTitle, SectionHeading } from "@/components/section";
 import { TaskRow } from "@/components/task-row";
+import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import {
@@ -14,6 +26,7 @@ import {
   useToday,
 } from "@/data/hooks";
 import type { Task } from "@/data/types";
+import { dayHeading } from "@/lib/dates";
 import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
 
@@ -69,53 +82,94 @@ function InboxItem({ task }: { task: Task }) {
   const actions = useActions();
   const today = useToday();
   const goals = useOpenGoals();
+  const navigate = useNavigate();
+  const notify = useNotify();
   const [, open] = useOpenTask();
   const [panel, setPanel] = useState<Panel>(null);
-  const [message, setMessage] = useState("");
   const id = useId();
 
   async function run(fn: () => Promise<unknown>) {
-    setMessage("");
     try {
       await fn();
     } catch (err) {
-      if (err instanceof ActionError) setMessage(err.message);
+      if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
       else throw err;
     }
   }
 
+  // Approved: verbs that say what happens, each with its icon.
   return (
     <li className="border-t border-line py-3">
-      <button
-        type="button"
-        onClick={() => open(task.id)}
-        className="min-h-11 w-full text-left text-[17px]/[1.3] font-medium min-[900px]:text-lg/[1.3]"
-      >
-        {task.title}
-      </button>
-      <fieldset className="mt-2 flex min-w-0 flex-wrap gap-2">
+      <div className="flex items-center gap-3">
+        <DoneBox
+          done={task.status === "done"}
+          title={task.title}
+          onToggle={() =>
+            void run(async () => {
+              // A done task leaves the Inbox, so say where it went.
+              await actions.toggleDone(task.id);
+              notify({
+                title: `Done: ${task.title}`,
+                icon: CheckIcon,
+                action: { label: "Undo", run: () => void actions.toggleDone(task.id) },
+              });
+            })
+          }
+        />
+        <button
+          type="button"
+          onClick={() => open(task.id)}
+          className="min-h-11 min-w-0 flex-1 text-left text-[17px]/[1.3] font-medium min-[900px]:text-lg/[1.3]"
+        >
+          {task.title}
+        </button>
+      </div>
+      {/* On wider screens, indented to line up with the title; the phone needs the width. */}
+      <fieldset className="mt-2 flex min-w-0 flex-wrap gap-2 min-[900px]:pl-[47px]">
         <legend className="sr-only">Place {task.title}</legend>
-        <Button variant="chip" onClick={() => void run(() => actions.plan(task.id, today))}>
-          Today
+        <Button
+          variant="chip"
+          onClick={() =>
+            void run(async () => {
+              await actions.plan(task.id, today);
+              notify({ title: `Planned for today: ${task.title}`, icon: PlannedIcon });
+            })
+          }
+        >
+          <TodayIcon size={18} />
+          Do today
         </Button>
         <Button
           variant="chip"
-          aria-pressed={panel === "date"}
           aria-expanded={panel === "date"}
           onClick={() => setPanel(panel === "date" ? null : "date")}
         >
-          Date
+          <PlanIcon size={18} />
+          Pick a day
         </Button>
         <Button
           variant="chip"
-          aria-pressed={panel === "goal"}
           aria-expanded={panel === "goal"}
           onClick={() => setPanel(panel === "goal" ? null : "goal")}
         >
-          Goal
+          <GoalsIcon size={18} />
+          Add to a goal
         </Button>
-        <Button variant="chip" onClick={() => void run(() => actions.promote(task.id, null))}>
-          Project
+        <Button
+          variant="chip"
+          onClick={() =>
+            void run(async () => {
+              const projectId = await actions.promote(task.id, null);
+              notify({
+                title: `Made a project: ${task.title}`,
+                icon: MakeProjectIcon,
+                action: { label: "Open", run: () => navigate(`/projects/${projectId}`) },
+              });
+            })
+          }
+        >
+          <MakeProjectIcon size={18} />
+          Make it a project
         </Button>
       </fieldset>
 
@@ -128,7 +182,14 @@ function InboxItem({ task }: { task: Task }) {
             min={today}
             onChange={(e) => {
               const day = e.target.value;
-              if (day) void run(() => actions.plan(task.id, day));
+              if (day)
+                void run(async () => {
+                  await actions.plan(task.id, day);
+                  notify({
+                    title: `Planned for ${dayHeading(day, today)}: ${task.title}`,
+                    icon: PlannedIcon,
+                  });
+                });
             }}
           />
         </div>
@@ -137,14 +198,19 @@ function InboxItem({ task }: { task: Task }) {
         <div className="mt-3 max-w-80">
           <Label htmlFor={`${id}-goal`}>Goal</Label>
           {goals.length === 0 ? (
-            <p className="text-muted-foreground">No goals yet.</p>
+            <p className="text-muted-foreground">No goals yet. Add one on the Goals screen.</p>
           ) : (
             <Select
               id={`${id}-goal`}
               defaultValue=""
               onChange={(e) => {
                 const goalId = e.target.value;
-                if (goalId) void run(() => actions.update(task.id, { goalId, projectId: null }));
+                const goal = goals.find((g) => g.id === goalId);
+                if (goalId)
+                  void run(async () => {
+                    await actions.update(task.id, { goalId, projectId: null });
+                    notify({ title: `Added to ${goal?.title ?? "the goal"}`, icon: GoalsIcon });
+                  });
               }}
             >
               <option value="" disabled>
@@ -158,11 +224,6 @@ function InboxItem({ task }: { task: Task }) {
             </Select>
           )}
         </div>
-      )}
-      {message && (
-        <p className="mt-2 text-sm" role="status">
-          {message}
-        </p>
       )}
     </li>
   );

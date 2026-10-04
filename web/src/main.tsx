@@ -5,14 +5,17 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { AppShell } from "@/components/app-shell";
 import { InstallContext } from "@/components/install-button";
+import { ToastProvider } from "@/components/toaster";
 import { useAuth } from "@/data/hooks";
 import { DataProvider } from "@/data/provider";
 import { InstallPrompt } from "@/lib/install";
+import GoalScreen from "@/routes/goal";
 import Goals from "@/routes/goals";
 import Inbox from "@/routes/inbox";
 import Login from "@/routes/login";
-import Pick from "@/routes/pick";
 import Plan from "@/routes/plan";
+import PlanProjects from "@/routes/plan-projects";
+import ProjectScreen from "@/routes/project";
 import Today from "@/routes/today";
 
 function SignedIn() {
@@ -37,10 +40,13 @@ const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: "/", element: <Today /> },
-          { path: "/pick", element: <Pick /> },
+          { path: "/pick", element: <Navigate to="/?pick=1" replace /> },
           { path: "/inbox", element: <Inbox /> },
           { path: "/plan", element: <Plan /> },
+          { path: "/plan/projects", element: <PlanProjects /> },
+          { path: "/projects/:id", element: <ProjectScreen /> },
           { path: "/goals", element: <Goals /> },
+          { path: "/goals/:id", element: <GoalScreen /> },
           { path: "*", element: <Navigate to="/" replace /> },
         ],
       },
@@ -62,9 +68,11 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <InstallContext value={install}>
-      <DataProvider fallback={<div className="min-h-dvh bg-bg" />}>
-        <RouterProvider router={router} />
-      </DataProvider>
+      <ToastProvider>
+        <DataProvider fallback={<div className="min-h-dvh bg-bg" />}>
+          <RouterProvider router={router} />
+        </DataProvider>
+      </ToastProvider>
     </InstallContext>
   </StrictMode>,
 );

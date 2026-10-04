@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
@@ -19,18 +20,12 @@ export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
     <span className="relative block">
       <select className={cn(fieldClass, "h-12 appearance-none pr-10", className)} {...props} />
-      <svg
+      <ChevronDown
         aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2"
-        fill="none"
-        stroke="currentColor"
+        size={20}
         strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
+        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2"
+      />
     </span>
   );
 }
