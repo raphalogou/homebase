@@ -12,6 +12,7 @@ import {
   CircleCheck,
   ClipboardCheck,
   CloudOff,
+  ExternalLink,
   Eye,
   EyeOff,
   FileText,
@@ -95,3 +96,4 @@ export const AddIcon = icon(Plus);
 export const DarkIcon = icon(Moon);
 export const LightIcon = icon(SunMedium);
 export const SystemIcon = icon(Monitor);
+export const ExternalIcon = icon(ExternalLink);

@@ -1,7 +1,7 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { useId, useMemo, useState } from "react";
 import { ACCOUNT_VIEWS } from "@/components/account-forms";
-import { CheckIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
+import { CheckIcon, ExternalIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
 import { Empty } from "@/components/section";
 import { useShowShortcuts } from "@/components/shortcuts";
 import { InlineError, SkeletonRows } from "@/components/states";
@@ -20,6 +20,7 @@ import { useModal } from "@/lib/modal";
 import { setTheme, type Theme, useTheme } from "@/lib/theme";
 import { labelFromUA } from "@/lib/ua";
 import { useIsDesktop } from "@/lib/use-media";
+import { COMMIT, REPOSITORY, VERSION } from "@/lib/version";
 
 function ago(ms: number): string {
   const mins = Math.round((Date.now() - ms) / 60000);
@@ -36,6 +37,7 @@ const TABS = [
   { value: "backups", label: "Backups" },
   { value: "account", label: "Account" },
   { value: "sessions", label: "Sessions" },
+  { value: "about", label: "About" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["value"];
@@ -48,7 +50,7 @@ const tabClass =
   "flex min-h-11 shrink-0 items-center rounded-md px-3 text-left text-[15px] font-medium whitespace-nowrap hover:bg-soft data-active:bg-soft data-active:font-semibold focus-visible:outline-offset-[-2px]";
 
 // Approved design: a modal over the current screen with a tab for each part:
-// Time and week, Calendar, Backups, Account, Sessions (?settings=calendar; "1" is the
+// Time and week, Calendar, Backups, Account, Sessions, About (?settings=calendar; "1" is the
 // first). The tabs are a column on desktop and a scrolling row on the phone.
 // Changing the username or passphrase swaps the content for that form
 // (?settings=username), with a back button to the Account tab.
@@ -146,6 +148,9 @@ export function SettingsDialog() {
                     Log out of this device
                   </Button>
                 </div>
+              </Tabs.Panel>
+              <Tabs.Panel value="about">
+                <About />
               </Tabs.Panel>
             </div>
           </Tabs.Root>
@@ -362,6 +367,63 @@ function Backups({ run }: { run: Run }) {
         A copy on the same disk does not survive losing that disk. Set HOMEBASE_BACKUP_DIR to
         another one, or copy this folder elsewhere now and then.
       </p>
+    </div>
+  );
+}
+
+function About() {
+  const build = COMMIT === "unknown" ? null : `${REPOSITORY}/commit/${COMMIT}`;
+  const link = (href: string, label: string, detail: string) => (
+    <li className="border-t border-line first:border-t-0">
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="-mx-3 flex min-h-16 items-center gap-3 rounded-md px-3 py-2.5 hover:bg-soft focus-visible:outline-offset-[-2px]"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">{label}</span>
+          <span className="block truncate text-[13px] text-muted-foreground">{detail}</span>
+        </span>
+        <ExternalIcon size={18} className="shrink-0 text-muted-foreground" />
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    </li>
+  );
+
+  return (
+    <div>
+      <div className="flex items-center gap-4">
+        <img src="/icon.svg" alt="" className="size-14 rounded-[13px] border border-line" />
+        <div>
+          <p className="text-[22px]/[1.2] font-bold">Homebase</p>
+          <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
+            {VERSION}
+            {build && (
+              <>
+                {" · "}
+                <a
+                  href={build}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline-offset-2 hover:underline"
+                >
+                  {COMMIT}
+                </a>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+      <p className="mt-5 text-muted-foreground">
+        A calm planner for one person. Goals give your tasks a reason, each day you choose up to
+        three, and up to three reminders a day keep it in mind. It works offline and syncs when you
+        are back.
+      </p>
+      <ul className="mt-6">
+        {link(REPOSITORY, "Source code", REPOSITORY.replace("https://", ""))}
+        {link(`${REPOSITORY}/issues`, "Report a problem", "Open an issue on GitHub")}
+      </ul>
     </div>
   );
 }
