@@ -12,7 +12,7 @@ Source of truth for the data model, sync protocol and API. If code and this file
 - **Status:** goals and projects: `open | paused | done | dropped`. Tasks: `open | done | dropped`.
 - **Ordering:** `plan_rank` is a float. Dragging sets the rank to the midpoint of the new neighbours; renumber the day when the gap falls below 1e-6.
 - **Limits:** titles 300 chars, notes and note attachments 20,000, files 25 MB.
-- **Errors:** `{"error":{"code","message"}}` with a matching HTTP status. Codes: `invalid` (400), `unauthorized` (401), `not_found` (404), `too_large` (413), `rate_limited` (429).
+- **Errors:** `{"error":{"code","message","field"?}}` with a matching HTTP status. `field` names the request field a message belongs to (`username`, `passphrase`, `current`, `next`), so a form can show it under that field. Codes: `invalid` (400), `unauthorized` (401), `not_found` (404), `too_large` (413), `rate_limited` (429).
 
 ## 2. Schema (`server/migrations/0001_init.sql`)
 
@@ -152,7 +152,20 @@ CREATE INDEX attach_rev     ON attachments(rev);
 CREATE INDEX repeats_rev    ON repeats(rev);
 ```
 
-`settings` gets its single row at first run, because the calendar token must be random. Migrations are append-only: never edit `0001`, add `0002`.
+`settings` gets its single row at first run, because the calendar token must be random. Migrations are append-only: never edit an applied file, add the next number.
+
+### `server/migrations/0002_account.sql`
+
+```sql
+CREATE TABLE account (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  username TEXT NOT NULL CHECK (length(username) BETWEEN 3 AND 32 AND username = lower(username)),
+  passphrase_hash TEXT NOT NULL,
+  changed_at INTEGER NOT NULL                        -- when the passphrase was last set
+);
+```
+
+The single account. It is not synced. It is created by `POST /api/setup` on a fresh install, or, on an install from before usernames, from `HOMEBASE_PASSPHRASE_HASH` with the username `owner` the first time the server starts. Once the row exists the variable is ignored, so a passphrase changed in Settings survives a restart.
 
 ## 3. Sync protocol
 
@@ -190,9 +203,14 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/login` | `{passphrase}` | 204 and cookie `hb_session` (HttpOnly, Secure, SameSite=Lax, 180 days, sliding). Five failures per 10 min per address, then 429. |
+| `GET /api/setup` | none, no cookie | `{needed}`: true until the account exists. |
+| `POST /api/setup` | `{username, passphrase}` | 204 and the session cookie. Works only while no account exists (`invalid` afterwards). Shares the login limit. |
+| `POST /api/login` | `{username, passphrase}` | 204 and cookie `hb_session` (HttpOnly, Secure, SameSite=Lax, 180 days, sliding). A wrong pair is 401 "That username or passphrase did not match.", never saying which. Five failures per 10 min per address, then 429. |
+| `GET /api/account` | none | `{username, passphraseChangedAt}` |
+| `PUT /api/account/username` | `{username, passphrase}` | `{username, passphraseChangedAt}`. The passphrase confirms the change. |
+| `PUT /api/account/passphrase` | `{current, next}` | `{username, passphraseChangedAt}`. Logs out every other session; this one stays. |
 | `POST /api/logout` | none | 204 |
-| `GET /api/me` | none | `{tz, weekStart, rev}` |
+| `GET /api/me` | none | `{tz, weekStart, rev, username}` |
 | `GET /api/sync?since=N&limit=500` | none | `{rev, more, goals[], projects[], tasks[], repeats[], attachments[], reminders[]}` |
 | `POST /api/sync` | `{base, ops[]}` | `{rev, applied[], rejected[{id,reason}], changes}` |
 | `POST /api/promote` | `{taskId, goalId?}` | `{project, removedTaskId}`. One transaction: new project from an Inbox task, notes and attachments moved, task tombstoned. The project takes the task's title, notes and `due`; without `goalId` it keeps the task's goal. A task already in a project is `invalid`. |
@@ -277,12 +295,15 @@ All of these live on the server so every device sees the same result.
 
 ## 7. Security
 
-- One passphrase, stored only as an argon2id hash in configuration.
+- One account: a username and a passphrase, stored only as an argon2id hash in the `account` table.
+- **Username:** 3 to 32 characters from `a-z 0-9 . _ -`, compared without case and stored in lowercase.
+- **Passphrase:** at least 12 characters, at most 1000, no composition rules. Requests longer than 4096 bytes are refused before hashing.
+- Changing the username or the passphrase needs the current passphrase. Wrong passphrases on setup, login and both changes count toward the same limit of five per 10 minutes per address.
 - Session token: 32 random bytes in an HttpOnly, Secure, SameSite=Lax cookie. The database stores only its SHA-256.
 - The `X-Homebase` header and JSON content type on every write. Strict Content Security Policy, no third-party scripts, self-hosted fonts.
 - Every response carries `Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`. API responses are `Cache-Control: no-store`.
 - Sessions slide: `last_seen` moves at most once an hour, and the cookie is sent again when it does. A session unused for 180 days is deleted.
-- The login limit counts per client address. `X-Forwarded-For` is trusted only when the peer is loopback (Caddy or Tailscale on the same machine), and only its last entry.
+- The login limit counts per client address, and covers setup and the account changes too. `X-Forwarded-For` is trusted only when the peer is loopback (Caddy or Tailscale on the same machine), and only its last entry.
 - Request logs never include query strings, and `/calendar/` paths are logged redacted.
 - Backups: `homebase backup <dir>` runs `VACUUM INTO` into `<dir>/homebase-YYYYMMDD-HHMMSS.db`, copies stored files missing from `<dir>/files`, and copies the VAPID key, without which every device would have to turn reminders on again. It is safe while the server runs.
 

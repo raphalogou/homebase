@@ -13,9 +13,11 @@ import (
 	"homebase/migrations"
 )
 
-const pass = "correct horse battery"
+const (
+	pass = "correct horse battery"
+	user = "sam"
+)
 
-// testHash is computed once; argon2 at full strength is slow on purpose.
 func testHash(t *testing.T) Hash {
 	t.Helper()
 	s, err := HashPassphrase(pass)
@@ -102,7 +104,23 @@ type fixture struct {
 	now  *time.Time
 }
 
-func newFixture(t *testing.T, h Hash) fixture {
+// newFixture returns an Auth whose account is user with pass.
+func newFixture(t *testing.T) fixture {
+	t.Helper()
+	f := emptyFixture(t)
+	token, err := f.auth.Setup(f.ctx, user, pass, "setup", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Tests count sessions, so the one setup made is ended.
+	if err := f.auth.Logout(f.ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// emptyFixture returns an Auth on a fresh database, before setup.
+func emptyFixture(t *testing.T) fixture {
 	t.Helper()
 	d, err := db.OpenMemory()
 	if err != nil {
@@ -115,7 +133,7 @@ func newFixture(t *testing.T, h Hash) fixture {
 	}
 	now := time.Date(2026, 3, 4, 12, 0, 0, 0, time.UTC)
 	f := fixture{ctx: ctx, now: &now}
-	f.auth = New(store.NewSQLite(d), h, func() time.Time { return *f.now })
+	f.auth = New(store.NewSQLite(d), func() time.Time { return *f.now })
 	return f
 }
 
@@ -127,12 +145,12 @@ func code(err error) apperr.Code {
 }
 
 func TestSessions(t *testing.T) {
-	f := newFixture(t, testHash(t))
+	f := newFixture(t)
 
-	if _, err := f.auth.Login(f.ctx, "wrong", "1.2.3.4", "test"); code(err) != apperr.Unauthorized {
+	if _, err := f.auth.Login(f.ctx, user, "wrong", "1.2.3.4", "test"); code(err) != apperr.Unauthorized {
 		t.Fatalf("wrong passphrase: %v", err)
 	}
-	token, err := f.auth.Login(f.ctx, pass, "1.2.3.4", "test")
+	token, err := f.auth.Login(f.ctx, user, pass, "1.2.3.4", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +180,7 @@ func TestSessions(t *testing.T) {
 		t.Fatalf("expired session came back: %v", err)
 	}
 
-	token2, err := f.auth.Login(f.ctx, pass, "1.2.3.4", "test")
+	token2, err := f.auth.Login(f.ctx, user, pass, "1.2.3.4", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,28 +193,28 @@ func TestSessions(t *testing.T) {
 }
 
 func TestLoginRateLimit(t *testing.T) {
-	f := newFixture(t, testHash(t))
+	f := newFixture(t)
 	for range MaxLogins {
-		if _, err := f.auth.Login(f.ctx, "wrong", "5.6.7.8", ""); code(err) != apperr.Unauthorized {
+		if _, err := f.auth.Login(f.ctx, user, "wrong", "5.6.7.8", ""); code(err) != apperr.Unauthorized {
 			t.Fatalf("got %v", err)
 		}
 	}
 	// Even the right passphrase is refused while limited.
-	if _, err := f.auth.Login(f.ctx, pass, "5.6.7.8", ""); code(err) != apperr.RateLimited {
+	if _, err := f.auth.Login(f.ctx, user, pass, "5.6.7.8", ""); code(err) != apperr.RateLimited {
 		t.Fatalf("got %v, want rate_limited", err)
 	}
-	if _, err := f.auth.Login(f.ctx, pass, "9.9.9.9", ""); err != nil {
+	if _, err := f.auth.Login(f.ctx, user, pass, "9.9.9.9", ""); err != nil {
 		t.Fatalf("other address: %v", err)
 	}
 }
 
 func TestSessionsListAndRevoke(t *testing.T) {
-	f := newFixture(t, testHash(t))
-	phone, err := f.auth.Login(f.ctx, pass, "1.1.1.1", "Chrome on Android")
+	f := newFixture(t)
+	phone, err := f.auth.Login(f.ctx, user, pass, "1.1.1.1", "Chrome on Android")
 	if err != nil {
 		t.Fatal(err)
 	}
-	laptop, err := f.auth.Login(f.ctx, pass, "2.2.2.2", "Firefox on Linux")
+	laptop, err := f.auth.Login(f.ctx, user, pass, "2.2.2.2", "Firefox on Linux")
 	if err != nil {
 		t.Fatal(err)
 	}

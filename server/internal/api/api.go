@@ -43,7 +43,12 @@ func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
 
+	mux.HandleFunc("GET /api/setup", s.handleSetupNeeded)
+	mux.Handle("POST /api/setup", s.writeChecks(http.HandlerFunc(s.handleSetup)))
 	mux.Handle("POST /api/login", s.writeChecks(http.HandlerFunc(s.handleLogin)))
+	mux.Handle("GET /api/account", s.session(http.HandlerFunc(s.handleAccount)))
+	mux.Handle("PUT /api/account/username", s.writeChecks(s.session(http.HandlerFunc(s.handleChangeUsername))))
+	mux.Handle("PUT /api/account/passphrase", s.writeChecks(s.session(http.HandlerFunc(s.handleChangePassphrase))))
 	mux.Handle("POST /api/logout", s.writeChecks(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /api/me", s.session(http.HandlerFunc(s.handleMe)))
 	mux.Handle("GET /api/sync", s.session(http.HandlerFunc(s.handlePull)))
@@ -143,6 +148,7 @@ type errorBody struct {
 	Error struct {
 		Code    apperr.Code `json:"code"`
 		Message string      `json:"message"`
+		Field   string      `json:"field,omitempty"`
 	} `json:"error"`
 }
 
@@ -157,6 +163,7 @@ func (s *server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	var body errorBody
 	body.Error.Code = e.Code
 	body.Error.Message = e.Message
+	body.Error.Field = e.Field
 	if e.Code == apperr.RateLimited {
 		w.Header().Set("Retry-After", "600")
 	}

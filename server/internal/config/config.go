@@ -14,8 +14,8 @@ type Config struct {
 	Addr         string
 	BaseURL      string
 	VAPIDSubject string
-	// PassphraseHash is checked by the serve command, which is the only one
-	// that needs it.
+	// PassphraseHash is optional. An install from before usernames sets it;
+	// the server then creates the account from it once (auth.Bootstrap).
 	PassphraseHash string
 }
 

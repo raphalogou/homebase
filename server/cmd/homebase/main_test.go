@@ -48,9 +48,11 @@ func TestHashPassphraseMismatch(t *testing.T) {
 	}
 }
 
-func TestServeNeedsHash(t *testing.T) {
+// The variable is optional since accounts live in the database, but a
+// broken one still stops the server before it starts.
+func TestServeRejectsBadHash(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	env := map[string]string{"HOMEBASE_DATA": t.TempDir()}
+	env := map[string]string{"HOMEBASE_DATA": t.TempDir(), "HOMEBASE_PASSPHRASE_HASH": "not-a-hash"}
 	err := run([]string{"serve"}, func(k string) string { return env[k] }, nil, io.Discard, io.Discard, log)
 	if err == nil || !strings.Contains(err.Error(), "HOMEBASE_PASSPHRASE_HASH") {
 		t.Fatalf("err = %v", err)

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -38,13 +39,30 @@ const (
 	maxTime   = 20
 )
 
-// MinPassphrase is the shortest passphrase hash-passphrase accepts.
-const MinPassphrase = 10
+// MinPassphrase and MaxPassphrase bound a new passphrase, counted in
+// characters. There are no composition rules: length is what makes it strong.
+const (
+	MinPassphrase = 12
+	MaxPassphrase = 1000
+)
+
+// CheckNewPassphrase says why a passphrase cannot be set, in the words the
+// forms show under the field.
+func CheckNewPassphrase(passphrase string) error {
+	n := utf8.RuneCountInString(passphrase)
+	switch {
+	case n < MinPassphrase:
+		return fmt.Errorf("Use at least %d characters. You have %d.", MinPassphrase, n)
+	case n > MaxPassphrase:
+		return fmt.Errorf("Use at most %d characters.", MaxPassphrase)
+	}
+	return nil
+}
 
 // HashPassphrase returns the PHC string for a new passphrase.
 func HashPassphrase(passphrase string) (string, error) {
-	if len([]rune(passphrase)) < MinPassphrase {
-		return "", fmt.Errorf("passphrase must be at least %d characters", MinPassphrase)
+	if err := CheckNewPassphrase(passphrase); err != nil {
+		return "", err
 	}
 	salt := make([]byte, saltLen)
 	if _, err := rand.Read(salt); err != nil {

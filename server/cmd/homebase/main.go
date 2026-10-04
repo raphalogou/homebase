@@ -84,12 +84,11 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 }
 
 func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
-	if cfg.PassphraseHash == "" {
-		return errors.New("HOMEBASE_PASSPHRASE_HASH is not set; create it with: homebase hash-passphrase")
-	}
-	hash, err := auth.ParseHash(cfg.PassphraseHash)
-	if err != nil {
-		return fmt.Errorf("HOMEBASE_PASSPHRASE_HASH: %w", err)
+	// Checked before anything is created, so a broken variable fails fast.
+	if cfg.PassphraseHash != "" {
+		if _, err := auth.ParseHash(cfg.PassphraseHash); err != nil {
+			return fmt.Errorf("HOMEBASE_PASSPHRASE_HASH: %w", err)
+		}
 	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
@@ -109,6 +108,20 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err := sy.Init(ctx); err != nil {
 		return fmt.Errorf("first-run setup: %w", err)
 	}
+	au := auth.New(st, time.Now)
+	if cfg.PassphraseHash != "" {
+		created, err := au.Bootstrap(ctx, cfg.PassphraseHash)
+		if err != nil {
+			return fmt.Errorf("account from HOMEBASE_PASSPHRASE_HASH: %w", err)
+		}
+		if created {
+			log.Info("account created from HOMEBASE_PASSPHRASE_HASH", "username", auth.DefaultUsername)
+		}
+	} else if needed, err := au.SetupNeeded(ctx); err != nil {
+		return err
+	} else if needed {
+		log.Warn("no account yet: open Homebase in a browser to set it up")
+	}
 	keys, err := push.LoadOrCreateKeys(cfg.DataDir)
 	if err != nil {
 		return err
@@ -123,7 +136,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		Addr: cfg.Addr,
 		Handler: api.New(api.Deps{
 			Log:     log,
-			Auth:    auth.New(st, hash, time.Now),
+			Auth:    au,
 			Sync:    sy,
 			Blobs:   blobs,
 			Keys:    keys,
