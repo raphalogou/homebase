@@ -118,19 +118,19 @@ To create the account without the browser, for example on a server that is publi
 
 `homebase backup <dir>` copies the database (safely, while the server runs), the uploaded files and the push key into `<dir>`. Each run adds a dated copy of the database; files are shared between runs, so only new ones are copied. Old database copies are not removed; delete them as you see fit.
 
-**Docker:** make a backup folder the container can write to, then run it nightly from cron (`crontab -e`):
+**From Settings (any install):** turn on "Back up every day" in Settings, Backups. The server then makes a backup when the newest is older than `HOMEBASE_BACKUP_INTERVAL` (one day by default) or missing, checked each minute, so the first comes right away and one missed while it was off follows a restart. They go to `backups` in the data folder, which needs no setup but sits on the same disk. To keep them on another disk, set `HOMEBASE_BACKUP_DIR`; with Docker, mount a folder there:
 
 ```sh
 sudo install -d -o 65532 -g 65532 -m 700 /var/backups/homebase
-# stop and recreate the container once with the folder mounted:
+echo 'HOMEBASE_BACKUP_DIR=/backups' >> homebase.env
 docker rm -f homebase
 docker run -d --name homebase --restart unless-stopped --env-file homebase.env \
   -v homebase-data:/data -v /var/backups/homebase:/backups -p 127.0.0.1:8080:8080 homebase
-# crontab line:
-30 3 * * * docker exec homebase homebase backup /backups
 ```
 
-**systemd:** the timer in `deploy/` runs it at 03:30:
+A backup on demand: `docker exec homebase homebase backup /backups`, or `homebase backup <dir>`.
+
+**systemd timer (instead of the switch):** the timer in `deploy/` runs it at 03:30:
 
 ```sh
 sudo install -d -o homebase -g homebase -m 700 /var/backups/homebase
@@ -157,6 +157,8 @@ All configuration comes from environment variables.
 | `HOMEBASE_ADDR` | `:8080` | Listen address |
 | `HOMEBASE_BASE_URL` | the address requests come to | Public HTTPS address, used in the calendar link |
 | `HOMEBASE_VAPID_SUBJECT` | `mailto:admin@localhost` | Contact sent to push services; use your real address |
+| `HOMEBASE_BACKUP_DIR` | `backups` in the data folder | Where the backups go once switched on in Settings |
+| `HOMEBASE_BACKUP_INTERVAL` | `1d` | How often: whole days (`7d` for a week) or a Go duration (`12h`), at least `1h` |
 
 Commands of the binary:
 

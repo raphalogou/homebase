@@ -167,6 +167,14 @@ CREATE TABLE account (
 
 The single account. It is not synced. It is created by `POST /api/setup` on a fresh install, or, on an install from before usernames, from `HOMEBASE_PASSPHRASE_HASH` with the username `owner` the first time the server starts. Once the row exists the variable is ignored, so a passphrase changed in Settings survives a restart.
 
+### `server/migrations/0003_backups.sql`
+
+```sql
+ALTER TABLE settings ADD COLUMN backups INTEGER NOT NULL DEFAULT 0 CHECK (backups IN (0, 1));
+```
+
+The daily backup switch in Settings, off until chosen. While on, the server runs the same copy as `homebase backup` into `HOMEBASE_BACKUP_DIR`, or `backups` in the data folder, whenever the newest `homebase-*.db` there is older than `HOMEBASE_BACKUP_INTERVAL` (whole days like `7d` or a Go duration like `12h`, at least `1h`, default `1d`) or missing (checked each minute, so the first follows the switch and a missed one follows a restart). Old copies are not removed.
+
 ## 3. Sync protocol
 
 Revision-based: every change gets a number, and a device asks for everything newer than the last number it saw. Almost every write is a plain row upsert through `/api/sync`. Only multi-row operations get their own endpoint.
@@ -218,7 +226,7 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 | `POST /api/review/complete` | `{weekStart, decisions[{kind,id,action}]}`, action is `keep`, `pause` or `drop` | `{rev}`. Applies decisions, writes `review_log`. |
 | `POST /api/files` | multipart: `file`, `ownerKind`, `ownerId`, optional `name` | The new `attachments` row. Stored by SHA-256. |
 | `GET /api/files/{sha}` | none | The file. Images and PDFs inline, others as download. Always `X-Content-Type-Options: nosniff`. |
-| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart}` | The settings. `tz` must be a valid IANA name (`Local` is refused); `weekStart` is 0 or 1. `GET` also returns `calendarUrl`, built from `HOMEBASE_BASE_URL` or, without it, the address the request came to. |
+| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart, backups?}` | The settings. `tz` must be a valid IANA name (`Local` is refused); `weekStart` is 0 or 1; `backups` is a boolean, and a `PUT` without it leaves the switch as it is. `GET` also returns `backups`, `calendarUrl` (built from `HOMEBASE_BASE_URL` or, without it, the address the request came to), `backupDir`, `backupHours` (the interval in whole hours) and `lastBackupAt` (UTC ms of the newest copy, or null). |
 | `GET /api/sessions` | none | `[{id, label, createdAt, lastSeen, current}]`. `id` is the first 16 hex characters of the stored hash; neither the token nor the full hash is sent. Sessions unused for 180 days are left out. |
 | `POST /api/sessions/revoke` | `{id}` | 204. Logs that session out; ending one that is not there is fine. This device uses `/api/logout`. |
 | `PUT /api/reminders` | `[{slot, enabled, atLocal, kind}]`, at most 3 | The saved rows |

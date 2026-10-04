@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"homebase/internal/auth"
+	"homebase/internal/backup"
 	"homebase/internal/db"
 	"homebase/internal/files"
 	"homebase/internal/migrate"
@@ -87,7 +88,7 @@ func TestBackup(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "backups")
 	var out bytes.Buffer
 	now := time.Date(2026, 3, 4, 2, 0, 0, 0, time.UTC)
-	if err := backup(context.Background(), data, dest, now, &out); err != nil {
+	if err := backup.Run(context.Background(), data, dest, now, &out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +110,7 @@ func TestBackup(t *testing.T) {
 
 	// A second run the next night adds a new database copy and no files.
 	out.Reset()
-	if err := backup(context.Background(), data, dest, now.Add(24*time.Hour), &out); err != nil {
+	if err := backup.Run(context.Background(), data, dest, now.Add(24*time.Hour), &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "0 new files") {
@@ -121,5 +122,33 @@ func TestBackupNeedsAFolder(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if err := run([]string{"backup"}, func(string) string { return "" }, nil, io.Discard, io.Discard, log); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestBackupDue(t *testing.T) {
+	now := time.Date(2026, 10, 5, 3, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name  string
+		files []string
+		want  bool
+	}{
+		{"no backups yet", nil, true},
+		{"made an hour ago", []string{"homebase-20261005-020000.db"}, false},
+		{"a day old, newest wins", []string{"homebase-20261003-030000.db", "homebase-20261004-030030.db"}, true},
+		{"newest is recent", []string{"homebase-20261001-030000.db", "homebase-20261004-120000.db"}, false},
+		{"name that is not ours", []string{"homebase-copy.db"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, f := range tt.files {
+				if err := os.WriteFile(filepath.Join(dir, f), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := backup.Due(dir, now, 24*time.Hour); got != tt.want {
+				t.Errorf("Due = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

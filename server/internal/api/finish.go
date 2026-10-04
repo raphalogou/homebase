@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"homebase/internal/apperr"
+	"homebase/internal/backup"
 	"homebase/internal/ics"
 	"homebase/internal/recur"
 	"homebase/internal/syncer"
@@ -70,10 +71,19 @@ func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, err)
 		return
 	}
+	var lastBackup *int64
+	if t, ok := backup.Last(s.BackupDir); ok {
+		ms := t.UnixMilli()
+		lastBackup = &ms
+	}
 	writeJSON(w, s.Log, http.StatusOK, map[string]any{
-		"tz":          st.TZ,
-		"weekStart":   st.WeekStart,
-		"calendarUrl": s.calendarURL(r, token),
+		"tz":           st.TZ,
+		"weekStart":    st.WeekStart,
+		"calendarUrl":  s.calendarURL(r, token),
+		"backups":      st.Backups,
+		"backupDir":    s.BackupDir,
+		"backupHours":  int(s.BackupInterval.Hours()),
+		"lastBackupAt": lastBackup,
 	})
 }
 

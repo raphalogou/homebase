@@ -29,6 +29,9 @@ type Deps struct {
 	Sender sched.Sender
 	// BaseURL is HOMEBASE_BASE_URL; empty means "the address requests come to".
 	BaseURL string
+	// BackupDir and BackupInterval are shown in Settings.
+	BackupDir      string
+	BackupInterval time.Duration
 	// Web serves the built web app for every path that is not an API route.
 	Web http.Handler
 }

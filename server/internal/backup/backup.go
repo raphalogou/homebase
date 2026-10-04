@@ -1,4 +1,6 @@
-package main
+// Package backup copies the database, files and push key somewhere a
+// restore can use them, on demand (homebase backup) or daily from serve.
+package backup
 
 import (
 	"context"
@@ -6,15 +8,17 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"homebase/internal/db"
 	"homebase/internal/push"
 )
 
-// backup copies everything a restore needs into dir:
+// Run copies everything a restore needs into dir:
 //
 //	dir/homebase-YYYYMMDD-HHMMSS.db   a consistent copy, made with VACUUM INTO
 //	dir/files/ab/cd/<sha256>          uploaded files, shared between backups
@@ -23,7 +27,7 @@ import (
 //
 // It is safe while the server runs: VACUUM INTO reads a snapshot, and stored
 // files never change once written.
-func backup(ctx context.Context, dataDir, dir string, now time.Time, out io.Writer) error {
+func Run(ctx context.Context, dataDir, dir string, now time.Time, out io.Writer) error {
 	src := filepath.Join(dataDir, "homebase.db")
 	if _, err := os.Stat(src); err != nil {
 		return fmt.Errorf("no database at %s: %w", src, err)
@@ -56,6 +60,52 @@ func backup(ctx context.Context, dataDir, dir string, now time.Time, out io.Writ
 
 	_, err = fmt.Fprintf(out, "Database copied to %s\n%d new files copied to %s\n", dst, copied, filepath.Join(dir, "files"))
 	return err
+}
+
+// Loop backs up into dir every interval while on reports true. It checks each
+// minute against the newest copy in dir rather than a clock time, so the
+// first backup follows soon after it is switched on, and one missed while
+// the server was off happens soon after it starts again.
+func Loop(ctx context.Context, log *slog.Logger, on func(context.Context) (bool, error), dataDir, dir string, interval time.Duration) {
+	t := time.NewTicker(time.Minute)
+	defer t.Stop()
+	for {
+		enabled, err := on(ctx)
+		if err != nil && ctx.Err() == nil {
+			log.Error("backup", "err", err)
+		}
+		if now := time.Now(); enabled && Due(dir, now, interval) {
+			if err := Run(ctx, dataDir, dir, now, io.Discard); err != nil && ctx.Err() == nil {
+				log.Error("backup", "dir", dir, "err", err)
+			} else if err == nil {
+				log.Info("backup", "dir", dir)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// Due reports whether the newest database copy in dir is interval old or
+// missing. A minute of slack keeps the once-a-minute check from drifting a
+// minute later each time.
+func Due(dir string, now time.Time, interval time.Duration) bool {
+	last, ok := Last(dir)
+	return !ok || now.Sub(last) >= interval-time.Minute
+}
+
+// Last is when the newest database copy in dir was made. The names sort by
+// time, so the last match is the newest.
+func Last(dir string) (time.Time, bool) {
+	names, _ := filepath.Glob(filepath.Join(dir, "homebase-*.db"))
+	if len(names) == 0 {
+		return time.Time{}, false
+	}
+	t, err := time.Parse("homebase-20060102-150405.db", filepath.Base(slices.Max(names)))
+	return t, err == nil
 }
 
 // copyFiles copies stored files that the backup does not have yet. They are

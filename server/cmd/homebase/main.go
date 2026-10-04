@@ -20,6 +20,7 @@ import (
 
 	"homebase/internal/api"
 	"homebase/internal/auth"
+	"homebase/internal/backup"
 	"homebase/internal/config"
 	"homebase/internal/db"
 	"homebase/internal/files"
@@ -73,7 +74,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 		if err != nil {
 			return err
 		}
-		return backup(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
+		return backup.Run(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stderr, usage)
 		return nil
@@ -135,14 +136,16 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.New(api.Deps{
-			Log:     log,
-			Auth:    au,
-			Sync:    sy,
-			Blobs:   blobs,
-			Keys:    keys,
-			Sender:  sender,
-			BaseURL: cfg.BaseURL,
-			Web:     webui.Handler(),
+			Log:            log,
+			Auth:           au,
+			Sync:           sy,
+			Blobs:          blobs,
+			Keys:           keys,
+			Sender:         sender,
+			BaseURL:        cfg.BaseURL,
+			BackupDir:      cfg.BackupDir,
+			BackupInterval: cfg.BackupInterval,
+			Web:            webui.Handler(),
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Generous enough for a 25 MB upload on a slow phone connection.
@@ -156,6 +159,10 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	defer stopJobs()
 	reminders := sched.NewReminders(sy, sender, log, time.Now)
 	go sched.Run(jobs, log, sy, sy, blobs, reminders, 30*time.Second)
+	go backup.Loop(jobs, log, func(ctx context.Context) (bool, error) {
+		st, err := sy.GetSettings(ctx)
+		return st.Backups != nil && *st.Backups, err
+	}, cfg.DataDir, cfg.BackupDir, cfg.BackupInterval)
 
 	errc := make(chan error, 1)
 	go func() {

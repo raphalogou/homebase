@@ -17,14 +17,17 @@ import (
 type Settings struct {
 	TZ        string `json:"tz"`
 	WeekStart int    `json:"weekStart"`
+	// Backups switches the server's daily backup. PUT leaves it as it is
+	// when absent.
+	Backups *bool `json:"backups,omitempty"`
 }
 
-// GetSettings returns the user's zone and week start.
+// GetSettings returns the user's zone, week start and backup switch.
 func (s *Syncer) GetSettings(ctx context.Context) (Settings, error) {
 	var out Settings
 	err := s.store.Tx(ctx, func(tx store.Tx) error {
 		st, err := tx.Settings()
-		out = Settings{TZ: st.TZ, WeekStart: st.WeekStart}
+		out = Settings{TZ: st.TZ, WeekStart: st.WeekStart, Backups: &st.Backups}
 		return err
 	})
 	return out, err
@@ -42,7 +45,17 @@ func (s *Syncer) SaveSettings(ctx context.Context, in Settings) (Settings, error
 	if in.WeekStart != 0 && in.WeekStart != 1 {
 		return Settings{}, invalid("weekStart must be 0 (Sunday) or 1 (Monday).")
 	}
-	err := s.store.Tx(ctx, func(tx store.Tx) error { return tx.UpdateSettings(in.TZ, in.WeekStart) })
+	err := s.store.Tx(ctx, func(tx store.Tx) error {
+		if err := tx.UpdateSettings(in.TZ, in.WeekStart); err != nil {
+			return err
+		}
+		if in.Backups == nil {
+			st, err := tx.Settings()
+			in.Backups = &st.Backups
+			return err
+		}
+		return tx.SetBackups(*in.Backups)
+	})
 	return in, err
 }
 

@@ -93,8 +93,8 @@ func (t *sqliteTx) Savepoint(fn func() error) error {
 
 func (t *sqliteTx) Settings() (Settings, error) {
 	var s Settings
-	err := t.row(`SELECT tz, week_start, calendar_token, last_rollover FROM settings WHERE id = 1`).
-		Scan(&s.TZ, &s.WeekStart, &s.CalendarToken, &s.LastRollover)
+	err := t.row(`SELECT tz, week_start, calendar_token, last_rollover, backups FROM settings WHERE id = 1`).
+		Scan(&s.TZ, &s.WeekStart, &s.CalendarToken, &s.LastRollover, &s.Backups)
 	return s, notFound(err)
 }
 
@@ -414,6 +414,10 @@ func allRevs(c Changes) []int64 {
 
 func (t *sqliteTx) UpdateSettings(tz string, weekStart int) error {
 	return t.exec(`UPDATE settings SET tz = ?, week_start = ? WHERE id = 1`, tz, weekStart)
+}
+
+func (t *sqliteTx) SetBackups(on bool) error {
+	return t.exec(`UPDATE settings SET backups = ? WHERE id = 1`, on)
 }
 
 func (t *sqliteTx) OpenGoals() ([]Goal, error) {

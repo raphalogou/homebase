@@ -75,6 +75,7 @@ type Tx interface {
 	ChangesSince(since int64, limit int) (c Changes, more bool, last int64, err error)
 
 	UpdateSettings(tz string, weekStart int) error
+	SetBackups(on bool) error
 
 	// OpenGoals lists live open goals in sort_key order.
 	OpenGoals() ([]Goal, error)

@@ -137,3 +137,39 @@ func TestSessionsOverHTTP(t *testing.T) {
 		t.Errorf("revoked session = %d, want 401", rec.Code)
 	}
 }
+
+func TestBackupSwitch(t *testing.T) {
+	h := newServer(t)
+	token := login(t, h)
+	get := func() (st struct {
+		Backups      bool
+		LastBackupAt *int64
+	}) {
+		rec := do(h, call{method: "GET", path: "/api/settings", cookie: token})
+		if err := json.Unmarshal(rec.Body.Bytes(), &st); err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+	if st := get(); st.Backups || st.LastBackupAt != nil {
+		t.Fatalf("fresh install: %+v, want off and none made", st)
+	}
+	put := func(body string) {
+		if rec := do(h, call{method: "PUT", path: "/api/settings", body: body, cookie: token}); rec.Code != 200 {
+			t.Fatalf("PUT %s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	put(`{"tz":"UTC","weekStart":1,"backups":true}`)
+	if !get().Backups {
+		t.Fatal("switch on did not stick")
+	}
+	// Saving the zone alone leaves the switch as it is.
+	put(`{"tz":"Europe/Paris","weekStart":1}`)
+	if !get().Backups {
+		t.Fatal("a zone change turned backups off")
+	}
+	put(`{"tz":"Europe/Paris","weekStart":1,"backups":false}`)
+	if get().Backups {
+		t.Fatal("switch off did not stick")
+	}
+}

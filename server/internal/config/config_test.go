@@ -3,6 +3,7 @@ package config
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoad(t *testing.T) {
@@ -15,6 +16,7 @@ func TestLoad(t *testing.T) {
 		return a
 	}
 
+	const day = 24 * time.Hour
 	tests := []struct {
 		name    string
 		env     map[string]string
@@ -24,7 +26,7 @@ func TestLoad(t *testing.T) {
 		{
 			name: "defaults",
 			env:  map[string]string{},
-			want: Config{DataDir: abs("./data"), Addr: ":8080", VAPIDSubject: "mailto:admin@localhost"},
+			want: Config{DataDir: abs("./data"), Addr: ":8080", VAPIDSubject: "mailto:admin@localhost", BackupDir: abs("./data/backups"), BackupInterval: day},
 		},
 		{
 			name: "all set",
@@ -41,12 +43,19 @@ func TestLoad(t *testing.T) {
 				BaseURL:        "https://home.example.com",
 				VAPIDSubject:   "mailto:me@example.com",
 				PassphraseHash: "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$a2V5",
+				BackupDir:      "/srv/homebase/backups",
+				BackupInterval: day,
 			},
+		},
+		{
+			name: "backup folder elsewhere",
+			env:  map[string]string{"HOMEBASE_DATA": "/srv/homebase", "HOMEBASE_BACKUP_DIR": "/mnt/backups"},
+			want: Config{DataDir: "/srv/homebase", Addr: ":8080", VAPIDSubject: "mailto:admin@localhost", BackupDir: "/mnt/backups", BackupInterval: day},
 		},
 		{
 			name: "blank values fall back to defaults",
 			env:  map[string]string{"HOMEBASE_ADDR": "  "},
-			want: Config{DataDir: abs("./data"), Addr: ":8080", VAPIDSubject: "mailto:admin@localhost"},
+			want: Config{DataDir: abs("./data"), Addr: ":8080", VAPIDSubject: "mailto:admin@localhost", BackupDir: abs("./data/backups"), BackupInterval: day},
 		},
 		{
 			name:    "relative base URL",
@@ -99,6 +108,36 @@ func TestPassphraseHashQuotes(t *testing.T) {
 		}
 		if c.PassphraseHash != tt.want {
 			t.Errorf("%q -> %q, want %q", tt.in, c.PassphraseHash, tt.want)
+		}
+	}
+}
+
+func TestBackupInterval(t *testing.T) {
+	tests := []struct {
+		in   string
+		want time.Duration
+		ok   bool
+	}{
+		{"", 24 * time.Hour, true},
+		{"7d", 7 * 24 * time.Hour, true},
+		{"1d", 24 * time.Hour, true},
+		{"12h", 12 * time.Hour, true},
+		{"90m", 90 * time.Minute, true},
+		{"1m", 0, false},
+		{"0d", 0, false},
+		{"1.5d", 0, false},
+		{"-2d", 0, false},
+		{"week", 0, false},
+	}
+	for _, tt := range tests {
+		c, err := Load(func(k string) string {
+			if k == "HOMEBASE_BACKUP_INTERVAL" {
+				return tt.in
+			}
+			return ""
+		})
+		if (err == nil) != tt.ok || (tt.ok && c.BackupInterval != tt.want) {
+			t.Errorf("%q -> %v, %v; want %v, ok %v", tt.in, c.BackupInterval, err, tt.want, tt.ok)
 		}
 	}
 }

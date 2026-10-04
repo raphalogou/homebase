@@ -99,6 +99,7 @@ type Settings struct {
 	WeekStart     int
 	CalendarToken string
 	LastRollover  *string
+	Backups       bool
 }
 
 // PushSub is a browser's Web Push subscription; it is not synced.
