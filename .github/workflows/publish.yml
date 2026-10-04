@@ -1,7 +1,8 @@
 # Tests every push and pull request. Pushes to main publish
 # ghcr.io/<owner>/homebase:latest and :sha-<short> for amd64 and arm64; a
-# tag like v1.2.0 publishes :1.2.0 instead of :latest. Plain docker
-# commands, so no third-party actions.
+# tag like v1.2.0 publishes :1.2.0 instead of :latest, then creates the
+# GitHub release with its notes. Plain docker and gh commands, so no
+# third-party actions.
 name: CI and image
 
 on:
@@ -34,7 +35,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # the release, on tags
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -59,3 +60,22 @@ jobs:
             --build-arg COMMIT="${GITHUB_SHA::7}" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+      # After the image, so a release never points at an image that failed.
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_REF_NAME#v}"
+          prev=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "## Image"
+            echo
+            echo "\`docker pull $image\` (amd64 and arm64)"
+            echo
+            echo "## Commits"
+            echo
+            git log --no-merges --pretty='- %s (%h)' ${prev:+"$prev.."}"$GITHUB_REF_NAME"
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md --generate-notes

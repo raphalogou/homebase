@@ -126,7 +126,7 @@ To create the account without the browser, for example on a server that is publi
 
 ### Versions
 
-The version comes from git: a tag `v1.2.0` gives `v1.2.0`, later commits `v1.2.0-3-gabc1234`. `homebase version` prints it with the commit, the server logs it at start, and Settings, About shows both. To release, tag and push; CI publishes the image as `:1.2.0` for amd64 and arm64:
+The version comes from git: a tag `v1.2.0` gives `v1.2.0`, later commits `v1.2.0-3-gabc1234`. `homebase version` prints it with the commit, the server logs it at start, and Settings, About shows both. To release, tag and push. CI publishes the image as `:1.2.0` for amd64 and arm64, then creates the GitHub release: the `docker pull` line, the commits since the previous tag, and GitHub's generated notes:
 
 ```sh
 git tag v1.2.0 && git push origin v1.2.0
