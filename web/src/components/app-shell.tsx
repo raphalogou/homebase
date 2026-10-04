@@ -14,6 +14,7 @@ import {
   TodayIcon,
 } from "./icons";
 import { PickDialog } from "./pick-dialog";
+import { SyncBanner, SyncRailLine } from "./sync-banner";
 import { TaskPanel, TaskSheet } from "./task-editor";
 import { Toaster } from "./toaster";
 
@@ -107,6 +108,7 @@ export function AppShell() {
               {label}
             </NavLink>
           ))}
+          <SyncRailLine />
         </div>
       </nav>
 
@@ -177,6 +179,7 @@ export function Columns({ main, side, capture = false }: ColumnsProps) {
           capture ? "pb-[168px]" : "pb-[104px]",
         )}
       >
+        <SyncBanner />
         <div className="mx-auto w-full max-w-[780px]">{main}</div>
       </main>
       {right && (

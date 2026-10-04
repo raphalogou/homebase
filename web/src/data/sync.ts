@@ -13,6 +13,11 @@ const PUSH_BATCH = 500;
 
 export class SyncEngine {
   state: SyncState = "idle";
+  /** When the next retry after a failure is due, in ms since the epoch; 0 when none is. */
+  retryAt = 0;
+  /** True once a sync has completed since the app opened. */
+  loaded = false;
+  private stateListeners = new Set<() => void>();
   private running: Promise<void> | null = null;
   private again = false;
   private debounce: ReturnType<typeof setTimeout> | undefined;
@@ -31,14 +36,30 @@ export class SyncEngine {
     store.setOnWrite(() => this.soon());
   }
 
+  /** Listens for changes of state, retryAt or loaded. */
+  onState = (fn: () => void): (() => void) => {
+    this.stateListeners.add(fn);
+    return () => this.stateListeners.delete(fn);
+  };
+
+  private setState(state: SyncState, retryAt = 0): void {
+    if (state === this.state && retryAt === this.retryAt) return;
+    this.state = state;
+    this.retryAt = retryAt;
+    for (const fn of this.stateListeners) fn();
+  }
+
   /** Starts the triggers: focus, coming online, visibility, every minute. */
   start(): void {
     const now = () => void this.run();
+    // The browser knows at once; a request would only fail after a timeout.
+    const offline = () => this.setState("offline", this.retryAt);
     const visible = () => {
       if (document.visibilityState === "visible") void this.run();
     };
     window.addEventListener("focus", now);
     window.addEventListener("online", now);
+    window.addEventListener("offline", offline);
     document.addEventListener("visibilitychange", visible);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void this.run();
@@ -52,6 +73,7 @@ export class SyncEngine {
     this.stopFns.push(
       () => window.removeEventListener("focus", now),
       () => window.removeEventListener("online", now),
+      () => window.removeEventListener("offline", offline),
       () => document.removeEventListener("visibilitychange", visible),
       () => clearInterval(timer),
       () => navigator.serviceWorker?.removeEventListener("message", message),
@@ -91,21 +113,25 @@ export class SyncEngine {
   private async cycle(): Promise<void> {
     if (!this.store.signedIn) return;
     clearTimeout(this.retry);
-    this.state = "syncing";
+    this.setState("syncing");
     try {
       await this.push();
       await this.pull();
       this.backoff = 2000;
-      this.state = "idle";
+      if (!this.loaded) {
+        this.loaded = true;
+        await this.store.setLoaded();
+      }
+      this.setState("idle");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        this.state = "idle";
+        this.setState("idle");
         this.onSignedOut();
         return;
       }
-      this.state = err instanceof NetworkError ? "offline" : "error";
       // Retry with backoff; the online event also wakes us sooner.
       this.retry = setTimeout(() => void this.run(), this.backoff);
+      this.setState(err instanceof NetworkError ? "offline" : "error", Date.now() + this.backoff);
       this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
     }
   }

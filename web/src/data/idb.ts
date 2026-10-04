@@ -15,6 +15,8 @@ export interface MetaValues {
   me: Me;
   /** True once a login succeeded, so the app opens offline next time. */
   signedIn: boolean;
+  /** True once a first full sync finished, so screens stop showing skeletons. */
+  loaded: boolean;
 }
 
 interface Schema extends DBSchema {
