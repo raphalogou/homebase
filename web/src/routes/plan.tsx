@@ -227,6 +227,7 @@ function NewTaskForm({ onAdded }: { onAdded?: () => void }) {
           <Label htmlFor={`${id}-title`}>Task</Label>
           <Input
             id={`${id}-title`}
+            data-capture
             value={title}
             maxLength={300}
             onChange={(e) => setTitle(e.target.value)}

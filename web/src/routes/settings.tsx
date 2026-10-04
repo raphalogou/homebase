@@ -1,8 +1,9 @@
 import { useId, useMemo, useState } from "react";
 import { ChangePassphraseDialog, ChangeUsernameDialog } from "@/components/account-dialogs";
 import { Columns } from "@/components/app-shell";
-import { CheckIcon, NoticeIcon } from "@/components/icons";
+import { CheckIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
 import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
+import { useShowShortcuts } from "@/components/shortcuts";
 import { InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import type { AccountInfo, SessionInfo } from "@/data/types";
 import { changedOn } from "@/lib/dates";
 import { getTheme, setTheme, type Theme } from "@/lib/theme";
 import { labelFromUA } from "@/lib/ua";
+import { useIsDesktop } from "@/lib/use-media";
 
 function ago(ms: number): string {
   const mins = Math.round((Date.now() - ms) / 60000);
@@ -30,6 +32,8 @@ function ago(ms: number): string {
 export default function Settings() {
   const notify = useNotify();
   const { logout } = useAuth();
+  const desktop = useIsDesktop();
+  const showShortcuts = useShowShortcuts();
   // A new passphrase logs the other devices out, so the list loads again.
   const [sessionsKey, setSessionsKey] = useState(0);
 
@@ -52,9 +56,15 @@ export default function Settings() {
       <Sessions key={sessionsKey} run={run} />
       <div className="mt-10 border-t border-line pt-6">
         <Button variant="secondary" onClick={() => void logout()}>
+          <LogOutIcon size={20} />
           Log out of this device
         </Button>
       </div>
+      {desktop && (
+        <Button variant="text" className="mt-6" onClick={showShortcuts}>
+          Keyboard shortcuts
+        </Button>
+      )}
     </>
   );
   return <Columns main={main} />;
