@@ -4,7 +4,7 @@ import { useInbox, useTask } from "@/data/hooks";
 import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
-import { GoalsIcon, InboxIcon, PlanIcon, TodayIcon } from "./icons";
+import { GoalsIcon, InboxIcon, PlanIcon, RemindersIcon, TodayIcon } from "./icons";
 import { PickDialog } from "./pick-dialog";
 import { TaskPanel, TaskSheet } from "./task-editor";
 import { Toaster } from "./toaster";
@@ -77,6 +77,19 @@ export function AppShell() {
             </li>
           ))}
         </ul>
+        {/* DESIGN.md: Reminders sits at the bottom of the rail. */}
+        <NavLink
+          to="/reminders"
+          className={({ isActive }) =>
+            cn(
+              "mt-auto mb-8 flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
+              isActive && "bg-soft font-semibold",
+            )
+          }
+        >
+          <RemindersIcon size={20} />
+          Reminders
+        </NavLink>
       </nav>
 
       <div className="min-w-0 flex-1">

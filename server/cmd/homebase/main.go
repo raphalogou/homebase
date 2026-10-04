@@ -98,9 +98,11 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err := sy.Init(ctx); err != nil {
 		return fmt.Errorf("first-run setup: %w", err)
 	}
-	if _, err := push.LoadOrCreateKeys(cfg.DataDir); err != nil {
+	keys, err := push.LoadOrCreateKeys(cfg.DataDir)
+	if err != nil {
 		return err
 	}
+	sender := push.NewSender(keys, cfg.VAPIDSubject, &http.Client{Timeout: 15 * time.Second}, time.Now)
 	blobs, err := files.New(cfg.DataDir)
 	if err != nil {
 		return err
@@ -109,11 +111,13 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.New(api.Deps{
-			Log:   log,
-			Auth:  auth.New(st, hash, time.Now),
-			Sync:  sy,
-			Blobs: blobs,
-			Web:   webui.Handler(),
+			Log:    log,
+			Auth:   auth.New(st, hash, time.Now),
+			Sync:   sy,
+			Blobs:  blobs,
+			Keys:   keys,
+			Sender: sender,
+			Web:    webui.Handler(),
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Generous enough for a 25 MB upload on a slow phone connection.
@@ -125,7 +129,8 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 
 	jobs, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
-	go sched.Run(jobs, log, sy, sy, blobs, time.Minute)
+	reminders := sched.NewReminders(sy, sender, log, time.Now)
+	go sched.Run(jobs, log, sy, sy, blobs, reminders, 30*time.Second)
 
 	errc := make(chan error, 1)
 	go func() {

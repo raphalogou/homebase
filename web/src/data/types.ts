@@ -135,3 +135,13 @@ export interface Me {
   weekStart: 0 | 1;
   rev: number;
 }
+
+export type ReminderInput = Pick<Reminder, "slot" | "enabled" | "atLocal" | "kind">;
+
+/** A device that gets reminders; its push endpoint never leaves the server. */
+export interface Device {
+  id: string;
+  label: string;
+  createdAt: number;
+  lastOk: number | null;
+}

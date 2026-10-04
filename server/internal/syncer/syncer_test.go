@@ -502,3 +502,26 @@ func TestPullArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestClaimReminderOncePerDay(t *testing.T) {
+	e := newEnv(t)
+	tests := []struct {
+		slot int
+		date string
+		want bool
+	}{
+		{1, "2026-03-04", true},
+		{1, "2026-03-04", false},
+		{2, "2026-03-04", true},
+		{1, "2026-03-05", true},
+	}
+	for _, tt := range tests {
+		got, err := e.s.ClaimReminder(e.ctx, tt.slot, tt.date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != tt.want {
+			t.Errorf("ClaimReminder(%d, %s) = %v, want %v", tt.slot, tt.date, got, tt.want)
+		}
+	}
+}

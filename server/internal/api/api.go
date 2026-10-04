@@ -12,6 +12,8 @@ import (
 	"homebase/internal/apperr"
 	"homebase/internal/auth"
 	"homebase/internal/files"
+	"homebase/internal/push"
+	"homebase/internal/sched"
 	"homebase/internal/syncer"
 )
 
@@ -22,6 +24,9 @@ type Deps struct {
 	Sync *syncer.Syncer
 	// Blobs holds uploaded files.
 	Blobs *files.Blobs
+	// Keys and Sender are for Web Push.
+	Keys   push.Keys
+	Sender sched.Sender
 	// Web serves the built web app for every path that is not an API route.
 	Web http.Handler
 }
@@ -44,6 +49,14 @@ func New(d Deps) http.Handler {
 	mux.Handle("POST /api/promote", s.writeChecks(s.session(http.HandlerFunc(s.handlePromote))))
 	mux.Handle("POST /api/files", s.uploadChecks(s.session(http.HandlerFunc(s.handleUpload))))
 	mux.Handle("GET /api/files/{sha}", s.session(http.HandlerFunc(s.handleFile)))
+	mux.Handle("GET /api/push/key", s.session(http.HandlerFunc(s.handlePushKey)))
+	mux.Handle("GET /api/push/subscriptions", s.session(http.HandlerFunc(s.handleDevices)))
+	mux.Handle("POST /api/push/subscribe", s.writeChecks(s.session(http.HandlerFunc(s.handleSubscribe))))
+	mux.Handle("POST /api/push/unsubscribe", s.writeChecks(s.session(http.HandlerFunc(s.handleUnsubscribe))))
+	mux.Handle("POST /api/push/test", s.writeChecks(s.session(http.HandlerFunc(s.handlePushTest))))
+	mux.Handle("PUT /api/reminders", s.writeChecks(s.session(http.HandlerFunc(s.handleSaveReminders))))
+	mux.Handle("GET /api/settings", s.session(http.HandlerFunc(s.handleGetSettings)))
+	mux.Handle("PUT /api/settings", s.writeChecks(s.session(http.HandlerFunc(s.handlePutSettings))))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, apperr.New(apperr.NotFound, "No such endpoint."))

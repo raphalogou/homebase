@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 to 3 done.
+Status: Phases 0 to 3 done; Phase 4 built, waiting for a test on a real phone.
 
 ## Decisions already made
 
@@ -109,13 +109,22 @@ Changes after review (approved by the owner): toasts with Undo and Open; the pic
 
 ## Phase 4: reminders and push
 
-- [ ] `GET /api/push/key`, subscribe, unsubscribe, test.
-- [ ] Web Push sender implemented to RFC 8291 and RFC 8292. Use the standard library plus `golang.org/x/crypto` only if needed. Include a unit test that encrypts a payload and decrypts it with the subscriber's key.
-- [ ] Scheduler: 30-second ticker, `reminder_log` insert-first guard, 90-minute grace, message builders from section 6.
-- [ ] Service worker `push` and `notificationclick` handlers; tapping opens Today and triggers a sync.
-- [ ] Reminders screen (phone and desktop): three slots, toggles, time inputs, device list, test button, notification permission flow.
+- [x] `GET /api/push/key`, subscribe, unsubscribe, test.
+- [x] Web Push sender implemented to RFC 8291 and RFC 8292. Use the standard library plus `golang.org/x/crypto` only if needed. Include a unit test that encrypts a payload and decrypts it with the subscriber's key.
+- [x] Scheduler: 30-second ticker, `reminder_log` insert-first guard, 90-minute grace, message builders from section 6.
+- [x] Service worker `push` and `notificationclick` handlers; tapping opens Today and triggers a sync.
+- [x] Reminders screen (phone and desktop): three slots, toggles, time inputs, device list, test button, notification permission flow.
 
 **Done when:** on an Android phone with the app installed and closed, the 08:00 notification arrives once and tapping it opens Today. Deploy first (HTTPS required) to test this.
+
+Notes:
+
+- Web Push is written with the standard library only (`crypto/ecdh`, `crypto/hkdf`, AES-GCM, ES256), so no module was added. The encryption is checked byte for byte against the worked example in RFC 8291 Appendix A, and against a decrypting test browser. The VAPID token is checked by verifying its signature. A test push service over TLS checks the whole path, including removing a subscription the service reports gone (410).
+- Approved and added to the spec: `GET /api/push/subscriptions` (devices without their endpoints) and `POST /api/push/unsubscribe` by `id`, so an old phone can be removed from the laptop.
+- Verified in headless Chromium: the Reminders screen at both widths; saving a time and a toggle (they reach the server and other devices through sync); the browser's zone adopted on opening Reminders; the service worker showing a reminder fed through the DevTools protocol, with title, body, tag, icon and the status-bar badge. Ungoogled Chromium has no push service, so turning reminders on there shows "This browser cannot get reminders."
+- **Not verified, and the "Done when" needs it:** a real Android phone, with the app installed and closed, over HTTPS. Deploy first (Phase 5 has the deploy files), turn reminders on in Reminders, use "Send a test now", then wait for 08:00. Tapping the notification should open Today.
+- `notificationclick` uses the open window if there is one, otherwise opens `/`. It only ever opens paths of this app.
+- Found while testing: a failed browser subscribe threw a browser error the screen did not show; it now explains itself. Long toast messages wrap instead of being cut off.
 
 ## Phase 5: finish
 

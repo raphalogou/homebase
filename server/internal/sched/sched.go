@@ -34,14 +34,18 @@ type Remover interface {
 // nightly; hourly is cheap and catches up after the server was off.
 const CleanEvery = time.Hour
 
-// Run checks once a tick until ctx ends. tick is a minute in production.
-func Run(ctx context.Context, log *slog.Logger, r Rollover, o Orphans, rm Remover, tick time.Duration) {
+// Run checks once a tick until ctx ends. tick is 30 seconds in production,
+// so a reminder goes out within half a minute of its time.
+func Run(ctx context.Context, log *slog.Logger, r Rollover, o Orphans, rm Remover, rem *Reminders, tick time.Duration) {
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	var lastClean time.Time
 	for {
 		if err := runRollover(ctx, r); err != nil && ctx.Err() == nil {
 			log.Error("rollover", "err", err)
+		}
+		if err := rem.Tick(ctx); err != nil && ctx.Err() == nil {
+			log.Error("reminders", "err", err)
 		}
 		if time.Since(lastClean) >= CleanEvery {
 			lastClean = time.Now()

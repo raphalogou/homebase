@@ -412,6 +412,55 @@ func allRevs(c Changes) []int64 {
 	return revs
 }
 
+func (t *sqliteTx) UpdateSettings(tz string, weekStart int) error {
+	return t.exec(`UPDATE settings SET tz = ?, week_start = ? WHERE id = 1`, tz, weekStart)
+}
+
+func (t *sqliteTx) OpenGoals() ([]Goal, error) {
+	return queryAll(t, `SELECT `+goalCols+` FROM goals WHERE status = 'open' AND deleted_at IS NULL
+		ORDER BY sort_key, created_at, id`, scanGoal)
+}
+
+func (t *sqliteTx) TasksPlannedOn(date string) ([]Task, error) {
+	return queryAll(t, `SELECT `+taskCols+` FROM tasks WHERE planned_on = ? AND deleted_at IS NULL
+		AND status != 'dropped' ORDER BY plan_rank IS NULL, plan_rank, created_at, id`, scanTask, date)
+}
+
+// Push subscriptions and the reminder log
+
+func (t *sqliteTx) PushSubs() ([]PushSub, error) {
+	return queryAll(t, `SELECT endpoint, p256dh, auth, label, created_at, last_ok FROM push_subs ORDER BY created_at`,
+		func(sc interface{ Scan(...any) error }) (PushSub, error) {
+			var p PushSub
+			err := sc.Scan(&p.Endpoint, &p.P256DH, &p.Auth, &p.Label, &p.CreatedAt, &p.LastOK)
+			return p, err
+		})
+}
+
+func (t *sqliteTx) PutPushSub(p PushSub) error {
+	return t.exec(`INSERT INTO push_subs(endpoint, p256dh, auth, label, created_at, last_ok) VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, label = excluded.label`,
+		p.Endpoint, p.P256DH, p.Auth, p.Label, p.CreatedAt, p.LastOK)
+}
+
+func (t *sqliteTx) DeletePushSub(endpoint string) error {
+	return t.exec(`DELETE FROM push_subs WHERE endpoint = ?`, endpoint)
+}
+
+func (t *sqliteTx) TouchPushSub(endpoint string, lastOK int64) error {
+	return t.exec(`UPDATE push_subs SET last_ok = ? WHERE endpoint = ?`, lastOK, endpoint)
+}
+
+func (t *sqliteTx) LogReminder(slot int, localDate string, sentAt int64) (bool, error) {
+	res, err := t.tx.ExecContext(t.ctx, `INSERT INTO reminder_log(slot, local_date, sent_at) VALUES (?, ?, ?)
+		ON CONFLICT(slot, local_date) DO NOTHING`, slot, localDate, sentAt)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 // Sessions
 
 func (t *sqliteTx) Session(tokenHash string) (Session, error) {

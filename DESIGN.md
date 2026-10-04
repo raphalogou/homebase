@@ -117,7 +117,7 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 - **Toggle:** 52 by 32 px; ink track when on.
 - **Buttons:** primary is ink fill with light text, 52 px tall, radius 12; secondary is a 1 px ink outline; text buttons are 600 weight with an underline offset of 3 px. No arrows appended to labels.
 - **Inputs:** `--field` fill, 1 px `--line` border, radius 12, 48 px tall, always with a visible or screen-reader label. Focus shows a 2 px ink outline with 2 px offset.
-- **Toast:** approved. An ink bar with light text, an 18 px icon, one line, radius 12, at most five stacked, 4 s (6 s with an action). Phone: above the tab bar, or above the capture bar where there is one. Desktop: bottom left of the main column. It confirms what leaves the screen (captured, planned, made a project, uploaded, deleted) and says why something was refused (day full, upload failed). Removing from today and every delete offer Undo; making a project offers Open. Never red.
+- **Toast:** approved. An ink bar with light text, an 18 px icon, one line (wrapping when a message needs it), radius 12, at most five stacked, 4 s (6 s with an action). Phone: above the tab bar, or above the capture bar where there is one. Desktop: bottom left of the main column. It confirms what leaves the screen (captured, planned, made a project, uploaded, deleted) and says why something was refused (day full, upload failed). Removing from today and every delete offer Undo; making a project offers Open. Never red.
 - **Notification preview:** dark card, a rounded square with a bold "H" carrying the highlighter, app name and time, a 600 title and a body.
 
 ## Screens
@@ -133,7 +133,7 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 | Goal | `/goals/:id` | Serif title, progress, Projects, Tasks on their own, Notes, Links. Desktop shows the goal list on the left. |
 | Goals | `/goals` | Goal lines, then the approved "New goal" field under the list: a labelled field in the serif (placeholder "A statement of intent") and an ink "Add" button. |
 | Weekly review | `/review` | One-sentence summary in serif; "Gone quiet" with Keep, Pause, Drop; "Next week" shows a goal with nothing done and "Plan a task"; button "Finish review". |
-| Reminders | `/reminders` | Three slots (time, on or off, kind, description); devices; "Send a test now". |
+| Reminders | `/reminders` | Three slots (time, on or off, kind, description); devices; "Send a test now". Built as: one row per slot with the time as a 34 px tabular time input (a complete time saves at once), the kind name and a one-line description, and the 52 by 32 toggle; a line under the title says which zone the times use. "This device" shows its state (not supported, blocked, off with "Get reminders on this device", on with "Send a test now" and "Turn off on this device"). "Other devices" lists the rest with when each was last reached and a Remove button. Desktop reaches it from the bottom of the rail; the phone from a "Reminders" link at the foot of Today, since the tab bar has four places. |
 | Login | `/login` | Approved: the same top-aligned column as other screens. Highlighted wordmark, 36 px "Log in", one muted sentence, a labelled passphrase field, a full-width primary "Log in". A wrong passphrase shows a plain ink sentence under the field. |
 
 ## Copy

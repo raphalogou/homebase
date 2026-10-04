@@ -101,6 +101,16 @@ type Settings struct {
 	LastRollover  *string
 }
 
+// PushSub is a browser's Web Push subscription; it is not synced.
+type PushSub struct {
+	Endpoint  string
+	P256DH    string
+	Auth      string
+	Label     string
+	CreatedAt int64
+	LastOK    *int64
+}
+
 type Session struct {
 	TokenHash string
 	Label     string

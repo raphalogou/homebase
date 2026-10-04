@@ -77,3 +77,59 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith((async () => (await caches.match(req, { cacheName: CACHE })) ?? fetch(req))());
 });
+
+interface PushMessage {
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+  sync: boolean;
+}
+
+// A reminder from the server (docs/SPEC.md section 6). The message also asks
+// any open window to sync, so the app shows what the notification says.
+self.addEventListener("push", (event) => {
+  let msg: PushMessage = { title: "Homebase", body: "", url: "/", tag: "", sync: false };
+  try {
+    msg = { ...msg, ...(event.data?.json() as Partial<PushMessage>) };
+  } catch {
+    // An unreadable payload still shows the plain fallback.
+  }
+  event.waitUntil(
+    (async () => {
+      const options: NotificationOptions = {
+        body: msg.body,
+        icon: "/icon-192.png",
+        badge: "/badge-96.png",
+        data: { url: msg.url },
+      };
+      if (msg.tag) options.tag = msg.tag;
+      await self.registration.showNotification(msg.title, options);
+      if (msg.sync) {
+        for (const c of await self.clients.matchAll({ type: "window" }))
+          c.postMessage({ type: "sync" });
+      }
+    })(),
+  );
+});
+
+// Tapping a reminder opens Today, in the window already open if there is one.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const wanted = (event.notification.data as { url?: string } | null)?.url ?? "/";
+  // Only ever a path of this app, never another site.
+  const url = new URL(wanted.startsWith("/") ? wanted : "/", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows[0];
+      if (open) {
+        const client = await open.focus();
+        await client.navigate(url).catch(() => null);
+        client.postMessage({ type: "sync" });
+        return;
+      }
+      await self.clients.openWindow(url);
+    })(),
+  );
+});

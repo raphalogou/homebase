@@ -200,11 +200,12 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 | `POST /api/review/complete` | `{weekStart, decisions[{kind,id,action}]}`, action is `keep`, `pause` or `drop` | `{rev}`. Applies decisions, writes `review_log`. |
 | `POST /api/files` | multipart: `file`, `ownerKind`, `ownerId`, optional `name` | The new `attachments` row. Stored by SHA-256. |
 | `GET /api/files/{sha}` | none | The file. Images and PDFs inline, others as download. Always `X-Content-Type-Options: nosniff`. |
-| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart}` | The settings. `tz` must be a valid IANA name. |
+| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart}` | The settings. `tz` must be a valid IANA name (`Local` is refused); `weekStart` is 0 or 1. |
 | `PUT /api/reminders` | `[{slot, enabled, atLocal, kind}]`, at most 3 | The saved rows |
 | `GET /api/push/key` | none | `{publicKey}` (VAPID, base64url) |
 | `POST /api/push/subscribe` | `{endpoint, keys:{p256dh, auth}, label}` | 204 |
-| `POST /api/push/unsubscribe` | `{endpoint}` | 204 |
+| `POST /api/push/unsubscribe` | `{endpoint}` or `{id}` | 204. The device itself sends its endpoint; another device removes it by `id`. Removing one that is not there is fine. |
+| `GET /api/push/subscriptions` | none | `[{id, label, createdAt, lastOk}]`. `id` is the first 16 bytes of the endpoint's SHA-256 in hex, so a browser can find itself; the endpoint is never sent back, since it works like a password for the push service. |
 | `POST /api/push/test` | none | `{sent, failed}` |
 | `GET /calendar/{token}.ics` | none, no cookie | iCalendar feed. 404 for a wrong token. |
 | `POST /api/calendar/rotate` | none | `{url}`. The old link stops at once. |
@@ -246,6 +247,8 @@ All of these live on the server so every device sees the same result.
 - **Down for a while.** If the server was off for more than 90 minutes past a slot, skip it for the day.
 - **Delivery.** Web Push with VAPID keys generated at first run and kept in the data folder. Payloads encrypted `aes128gcm` (RFC 8291), VAPID JWT per RFC 8292. A 404 or 410 deletes the subscription.
 - **Time zone.** One zone for all devices, taken from the browser when the user opens Reminders.
+- **Details.** The scheduler ticks every 30 seconds. Push messages carry `{title, body, url, tag, sync}`, with `tag` = `reminder-<slot>` so a newer one replaces an unread one, and `sync: true` so an open window syncs. TTL is one hour, after which a reminder is stale. Send errors are logged by device label, never by endpoint. `PUT /api/reminders` stamps a revision on each saved slot, so other devices get the change through sync. A focus title rotates through the open goals by the number of days since 1970-01-01.
+- **Cases the table does not cover.** Focus with every planned task done: "All done for today." Check-in with nothing planned: "Nothing planned yet. Choose your three for today." Check-in or wrap with everything done: "All done for today." Focus with no goals: title "Today".
 
 | Slot kind | Title | Body | Opens |
 | --- | --- | --- | --- |

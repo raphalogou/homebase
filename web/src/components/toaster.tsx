@@ -70,7 +70,7 @@ export function Toaster() {
                 className="flex min-h-12 items-center gap-3 rounded-[12px] bg-ink py-1.5 pr-1.5 pl-4 text-field transition-[opacity,translate] duration-150 data-[ending-style]:translate-y-2 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-2 data-[starting-style]:opacity-0"
               >
                 {Icon && <Icon size={18} className="shrink-0" />}
-                <Toast.Title className="min-w-0 flex-1 truncate text-[15px] font-medium" />
+                <Toast.Title className="min-w-0 flex-1 py-1.5 text-[15px]/[1.35] font-medium" />
                 {t.actionProps && (
                   <Toast.Action className="min-h-11 shrink-0 rounded-md px-3 text-[15px] font-semibold underline underline-offset-[3px] focus-visible:outline-field" />
                 )}

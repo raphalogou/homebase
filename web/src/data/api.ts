@@ -1,7 +1,17 @@
 // The only module that talks to the server. Components use the hooks in
 // this folder instead.
 
-import type { Attachment, Me, Op, Project, PullResult, PushResult } from "./types.ts";
+import type {
+  Attachment,
+  Device,
+  Me,
+  Op,
+  Project,
+  PullResult,
+  PushResult,
+  Reminder,
+  ReminderInput,
+} from "./types.ts";
 
 /** An error answer from the server, with the code from docs/SPEC.md. */
 export class ApiError extends Error {
@@ -113,6 +123,20 @@ export const api = {
       size: Number(res.headers.get("Content-Length") ?? 0),
     };
   },
+  pushKey: () => request<{ publicKey: string }>("GET", "/api/push/key"),
+  subscribe: (sub: PushSubscriptionJSON, label: string) =>
+    request<void>("POST", "/api/push/subscribe", {
+      endpoint: sub.endpoint,
+      keys: { p256dh: sub.keys?.p256dh, auth: sub.keys?.auth },
+      label,
+    }),
+  unsubscribe: (by: { endpoint: string } | { id: string }) =>
+    request<void>("POST", "/api/push/unsubscribe", by),
+  devices: () => request<Device[]>("GET", "/api/push/subscriptions"),
+  pushTest: () => request<{ sent: number; failed: number }>("POST", "/api/push/test"),
+  saveReminders: (list: ReminderInput[]) => request<Reminder[]>("PUT", "/api/reminders", list),
+  putSettings: (tz: string, weekStart: 0 | 1) =>
+    request<{ tz: string; weekStart: 0 | 1 }>("PUT", "/api/settings", { tz, weekStart }),
   promote: (taskId: string, goalId: string | null) =>
     request<{ project: Project; removedTaskId: string }>(
       "POST",

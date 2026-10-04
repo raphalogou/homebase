@@ -16,6 +16,7 @@ import Login from "@/routes/login";
 import Plan from "@/routes/plan";
 import PlanProjects from "@/routes/plan-projects";
 import ProjectScreen from "@/routes/project";
+import Reminders from "@/routes/reminders";
 import Today from "@/routes/today";
 
 function SignedIn() {
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
           { path: "/projects/:id", element: <ProjectScreen /> },
           { path: "/goals", element: <Goals /> },
           { path: "/goals/:id", element: <GoalScreen /> },
+          { path: "/reminders", element: <Reminders /> },
           { path: "*", element: <Navigate to="/" replace /> },
         ],
       },

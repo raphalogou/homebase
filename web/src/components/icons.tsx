@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  Bell,
   CalendarCheck,
   CalendarDays,
   CalendarMinus,
@@ -65,3 +66,4 @@ export const UnplannedIcon = icon(CalendarMinus);
 export const DeleteIcon = icon(Trash2);
 export const NoticeIcon = icon(CircleAlert);
 export const UndoIcon = icon(Undo2);
+export const RemindersIcon = icon(Bell);

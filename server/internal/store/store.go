@@ -74,6 +74,21 @@ type Tx interface {
 	// were left out; last is the rev of the last row returned (or since).
 	ChangesSince(since int64, limit int) (c Changes, more bool, last int64, err error)
 
+	UpdateSettings(tz string, weekStart int) error
+
+	// OpenGoals lists live open goals in sort_key order.
+	OpenGoals() ([]Goal, error)
+	// TasksPlannedOn lists live, non-dropped tasks planned on date, in rank order.
+	TasksPlannedOn(date string) ([]Task, error)
+
+	PushSubs() ([]PushSub, error)
+	PutPushSub(PushSub) error
+	DeletePushSub(endpoint string) error
+	TouchPushSub(endpoint string, lastOK int64) error
+	// LogReminder records that slot fired on localDate. It reports false when
+	// a row already exists, which is what stops a second send.
+	LogReminder(slot int, localDate string, sentAt int64) (bool, error)
+
 	Session(tokenHash string) (Session, error)
 	InsertSession(Session) error
 	TouchSession(tokenHash string, lastSeen int64) error

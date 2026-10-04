@@ -15,6 +15,7 @@ import (
 	"homebase/internal/db"
 	"homebase/internal/files"
 	"homebase/internal/migrate"
+	"homebase/internal/push"
 	"homebase/internal/store"
 	"homebase/internal/syncer"
 	"homebase/migrations"
@@ -23,6 +24,13 @@ import (
 const pass = "correct horse battery"
 
 func newServer(t *testing.T) http.Handler {
+	t.Helper()
+	return newServerWith(t, http.DefaultClient)
+}
+
+// newServerWith uses client to reach push services, so a test can point
+// it at a fake one.
+func newServerWith(t *testing.T, client *http.Client) http.Handler {
 	t.Helper()
 	d, err := db.OpenMemory()
 	if err != nil {
@@ -51,12 +59,18 @@ func newServer(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
+	keys, err := push.LoadOrCreateKeys(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	return New(Deps{
-		Blobs: blobs,
-		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Auth:  auth.New(st, hash, time.Now),
-		Sync:  sy,
-		Web:   web,
+		Keys:   keys,
+		Sender: push.NewSender(keys, "mailto:me@example.com", client, time.Now),
+		Blobs:  blobs,
+		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Auth:   auth.New(st, hash, time.Now),
+		Sync:   sy,
+		Web:    web,
 	})
 }
 

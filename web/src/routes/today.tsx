@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router";
 import { Columns } from "@/components/app-shell";
 import { CaptureBar } from "@/components/capture-bar";
 import { GoalLine, Progress } from "@/components/goal-line";
-import { NoticeIcon, PlannedIcon } from "@/components/icons";
+import { NoticeIcon, PlannedIcon, RemindersIcon } from "@/components/icons";
 import { InstallButton } from "@/components/install-button";
 import { Empty, ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
 import { useTaskMeta } from "@/components/task-row";
@@ -90,7 +90,19 @@ export default function Today() {
       ) : (
         <CaptureBar fixed />
       )}
-      <InstallButton className="mt-8" />
+      <div className="mt-8 flex flex-wrap gap-x-5">
+        {/* The phone's tab bar has four places; Reminders is reached from here. */}
+        {!desktop && (
+          <Link
+            to="/reminders"
+            className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
+          >
+            <RemindersIcon size={20} />
+            Reminders
+          </Link>
+        )}
+        <InstallButton />
+      </div>
     </>
   );
 
