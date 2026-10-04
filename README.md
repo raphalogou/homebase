@@ -55,6 +55,13 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
    docker build -f deploy/Dockerfile -t homebase .
    ```
 
+   Or pull the one CI publishes from `main` (`.github/workflows/publish.yml`; a `v1.2.0` tag also publishes `:1.2.0`) and name it `homebase` for the steps below:
+
+   ```sh
+   docker pull ghcr.io/raphalogou/homebase:latest
+   docker tag ghcr.io/raphalogou/homebase:latest homebase
+   ```
+
 2. **Write the settings file:**
 
    ```sh

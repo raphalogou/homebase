@@ -1,0 +1,54 @@
+# Tests every push and pull request. Pushes to main publish
+# ghcr.io/<owner>/homebase:latest and :sha-<short>; a tag like v1.2.0 also
+# publishes :1.2.0. Plain docker commands, so no third-party actions.
+name: CI and image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make ci
+
+  publish:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags=(-t "$image:sha-${GITHUB_SHA::7}")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tags+=(-t "$image:${GITHUB_REF_NAME#v}")
+          else
+            tags+=(-t "$image:latest")
+          fi
+          docker build -f deploy/Dockerfile "${tags[@]}" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+          docker push --all-tags "$image"
