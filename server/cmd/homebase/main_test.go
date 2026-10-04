@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -150,5 +151,31 @@ func TestBackupDue(t *testing.T) {
 				t.Errorf("Due = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCLIFriendliness(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	none := func(string) string { return "" }
+	var ue usageError
+	if err := run([]string{"srve"}, none, nil, io.Discard, io.Discard, log); !errors.As(err, &ue) {
+		t.Errorf("unknown command: %v, want a usage error", err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"backup", "--help"}, none, nil, &out, io.Discard, log); err != nil || !strings.Contains(out.String(), "Commands:") {
+		t.Errorf("backup --help: %v %q", err, out.String())
+	}
+
+	var b bytes.Buffer
+	newLogger(&b, true).With("job", "backup").Error("failed", "err", "disk full")
+	if got := b.String(); !strings.Contains(got, "ERROR") || !strings.Contains(got, "failed") ||
+		!strings.Contains(got, "job="+reset+"backup") || !strings.Contains(got, red+`"disk full"`) {
+		t.Errorf("coloured line = %q", got)
+	}
+
+	for addr, want := range map[string]string{":8080": "http://localhost:8080", "127.0.0.1:9000": "http://127.0.0.1:9000", "[::]:80": "http://localhost:80"} {
+		if got := localURL(addr); got != want {
+			t.Errorf("localURL(%q) = %q, want %q", addr, got, want)
+		}
 	}
 }

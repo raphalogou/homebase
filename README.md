@@ -52,8 +52,11 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
 1. **Build the image** from a clone of this repository:
 
    ```sh
-   docker build -f deploy/Dockerfile -t homebase .
+   docker build -f deploy/Dockerfile -t homebase \
+     --build-arg VERSION=$(git describe --tags --always) --build-arg COMMIT=$(git rev-parse --short HEAD) .
    ```
+
+   Without the two `--build-arg`s it still builds, but Settings, About shows "dev".
 
    Or pull the one CI publishes from `main` (`.github/workflows/publish.yml`; a `v1.2.0` tag also publishes `:1.2.0`) and name it `homebase` for the steps below:
 
@@ -120,6 +123,14 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
 Then open the address in a browser straight away. The first visit shows **Set up Homebase**, where you choose a username and a passphrase of at least 12 characters; you are then logged in. Until that is done, anyone who reaches the address could do it instead, so do it as soon as the server is up. Both can be changed later in Settings.
 
 To create the account without the browser, for example on a server that is public from the start, put the line from `homebase hash-passphrase` in the settings file before the first start. The account is then created with the username `owner` and that passphrase. An install from before usernames gets the same: log in as `owner` with your passphrase and rename it in Settings. After the account exists the variable is no longer read.
+
+### Versions
+
+The version comes from git: a tag `v1.2.0` gives `v1.2.0`, later commits `v1.2.0-3-gabc1234`. `homebase version` prints it with the commit, the server logs it at start, and Settings, About shows both. To release, tag and push; CI publishes the image as `:1.2.0` for amd64 and arm64:
+
+```sh
+git tag v1.2.0 && git push origin v1.2.0
+```
 
 ### Backups
 

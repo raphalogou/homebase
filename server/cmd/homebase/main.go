@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -33,42 +34,56 @@ import (
 	"homebase/migrations"
 )
 
-const usage = `Usage: homebase <command>
-
-Commands:
-  serve              run the server
-  hash-passphrase    read a passphrase and print HOMEBASE_PASSPHRASE_HASH
-  backup <dir>       copy the database, files and push key into dir
-`
+// Set at build time by the Makefile and Dockerfile (-ldflags -X).
+var version, commit = "dev", "unknown"
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr, log); err != nil {
-		log.Error("exit", "err", err)
-		os.Exit(1)
+	p := colorFor(os.Stderr, os.Getenv)
+	log := newLogger(os.Stderr, p)
+	err := run(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr, log)
+	if err == nil {
+		return
 	}
+	fmt.Fprintf(os.Stderr, "%shomebase: %s%s\n", p.c(red), err, p.c(reset))
+	if ue := usageError(""); errors.As(err, &ue) {
+		fmt.Fprintln(os.Stderr, "Run 'homebase help' to see the commands and settings.")
+		os.Exit(2)
+	}
+	os.Exit(1)
 }
 
 func run(args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer, log *slog.Logger) error {
 	if len(args) == 0 {
 		_, _ = fmt.Fprint(stderr, usage)
-		return errors.New("no command given")
+		return usageError("no command given")
+	}
+	// "homebase serve --help" and the like show the help, not an error.
+	for _, a := range args[1:] {
+		if a == "-h" || a == "--help" {
+			_, err := fmt.Fprint(stdout, usage)
+			return err
+		}
 	}
 	switch args[0] {
+	case "version", "--version", "-v":
+		_, err := fmt.Fprintf(stdout, "homebase %s (%s)\n", version, commit)
+		return err
 	case "serve":
+		if len(args) > 1 {
+			return usageError(fmt.Sprintf("serve takes no arguments, got %q; settings come from HOMEBASE_* variables", strings.Join(args[1:], " ")))
+		}
 		cfg, err := config.Load(getenv)
 		if err != nil {
 			return err
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		return serve(ctx, cfg, log)
+		return serve(ctx, cfg, log, stderr, colorFor(stderr, getenv))
 	case "hash-passphrase":
 		return hashPassphrase(stdin, stdout, stderr)
 	case "backup":
 		if len(args) != 2 {
-			_, _ = fmt.Fprint(stderr, usage)
-			return errors.New("backup needs a folder: homebase backup <dir>")
+			return usageError("backup needs one folder: homebase backup <dir>")
 		}
 		cfg, err := config.Load(getenv)
 		if err != nil {
@@ -76,15 +91,14 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 		}
 		return backup.Run(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
 	case "help", "-h", "--help":
-		_, _ = fmt.Fprint(stderr, usage)
-		return nil
+		_, err := fmt.Fprint(stdout, usage)
+		return err
 	default:
-		_, _ = fmt.Fprint(stderr, usage)
-		return fmt.Errorf("unknown command %q", args[0])
+		return usageError(fmt.Sprintf("unknown command %q", args[0]))
 	}
 }
 
-func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+func serve(ctx context.Context, cfg config.Config, log *slog.Logger, out io.Writer, p palette) error {
 	// Checked before anything is created, so a broken variable fails fast.
 	if cfg.PassphraseHash != "" {
 		if _, err := auth.ParseHash(cfg.PassphraseHash); err != nil {
@@ -118,10 +132,10 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		if created {
 			log.Info("account created from HOMEBASE_PASSPHRASE_HASH", "username", auth.DefaultUsername)
 		}
-	} else if needed, err := au.SetupNeeded(ctx); err != nil {
+	}
+	needsSetup, err := au.SetupNeeded(ctx)
+	if err != nil {
 		return err
-	} else if needed {
-		log.Warn("no account yet: open Homebase in a browser to set it up")
 	}
 	keys, err := push.LoadOrCreateKeys(cfg.DataDir)
 	if err != nil {
@@ -164,10 +178,25 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		return st.Backups != nil && *st.Backups, err
 	}, cfg.DataDir, cfg.BackupDir, cfg.BackupInterval)
 
+	// Listening first turns a taken port into a clear error before the
+	// summary claims the address.
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return fmt.Errorf("cannot listen on %s (set HOMEBASE_ADDR to another address): %w", cfg.Addr, err)
+	}
+	settings, err := sy.GetSettings(ctx)
+	if err != nil {
+		return err
+	}
+	printSummary(out, p, summary{
+		Addr: cfg.Addr, BaseURL: cfg.BaseURL, DataDir: cfg.DataDir,
+		BackupDir: cfg.BackupDir, BackupInterval: cfg.BackupInterval,
+		Backups: settings.Backups != nil && *settings.Backups, NeedsSetup: needsSetup,
+	})
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Addr, "data", cfg.DataDir)
-		errc <- srv.ListenAndServe()
+		log.Info("listening", "addr", cfg.Addr, "version", version, "commit", commit)
+		errc <- srv.Serve(ln)
 	}()
 
 	select {
@@ -228,7 +257,7 @@ func noEcho(stdin io.Reader) func() {
 	if !ok {
 		return func() {}
 	}
-	if info, err := f.Stat(); err != nil || info.Mode()&os.ModeCharDevice == 0 {
+	if !isTerminal(f) {
 		return func() {}
 	}
 	stty := func(arg string) error {
