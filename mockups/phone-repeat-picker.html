@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repeat picker</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+
+<style>html{background:#CBCEC8}body{display:flex;justify-content:center}.frame{width:390px;flex:none}</style>
+</head>
+<body>
+<div class="frame"><div style="width:390px;height:900px;position:relative;overflow:hidden;box-sizing:border-box;background:#F2F3EF;color:#15191A;font-family:'Schibsted Grotesk',system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:rgba(10,14,24,.5)"></div><div style="position:absolute;left:0;right:0;bottom:0;background:#F2F3EF;border-radius:20px 20px 0 0;padding:10px 24px 28px;box-sizing:border-box">
+<div style="width:40px;height:4px;border-radius:4px;background:#D6D9D3;margin:0 auto 8px"></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:22px;font-weight:700;letter-spacing:-0.01em">Repeat</div><div style="font-size:14px;color:#5E655F">Take out the recycling</div></div><button style="height:44px;padding:0 4px;margin-right:-4px;border:0;background:none;color:#5E655F;font-size:15px;font-weight:500">Cancel</button></div>
+<div style="font-size:14px;font-weight:500;color:#5E655F;margin:18px 0 8px">How often</div>
+<div style="display:flex"><button aria-pressed="false" style="flex:1;min-width:0;height:44px;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:14px;border-radius:10px 0 0 10px">Off</button><button aria-pressed="false" style="flex:1;min-width:0;height:44px;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:14px;border-radius:0;margin:0 -1px">Daily</button><button aria-pressed="true" style="flex:1;min-width:0;height:44px;border:1px solid #15191A;background:#15191A;color:#F2F3EF;font-weight:600;font-size:14px;border-radius:0;margin:0 -1px">Weekly</button><button aria-pressed="false" style="flex:1;min-width:0;height:44px;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:14px;border-radius:0 10px 10px 0">Monthly</button></div>
+<div style="font-size:14px;font-weight:500;color:#5E655F;margin:18px 0 8px">Every</div>
+<div style="display:flex;align-items:center;gap:12px"><button aria-label="Fewer" style="width:44px;height:44px;border-radius:10px;border:1px solid #868D87;background:#FAFAF8;display:grid;place-items:center;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button><span style="min-width:28px;text-align:center;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums">1</span><button aria-label="More" style="width:44px;height:44px;border-radius:10px;border:1px solid #868D87;background:#FAFAF8;display:grid;place-items:center;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><span style="font-size:16px">week</span></div>
+<div style="font-size:14px;font-weight:500;color:#5E655F;margin:18px 0 8px">On</div>
+<div style="display:flex;justify-content:space-between"><button aria-pressed="false" aria-label="Monday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">M</button><button aria-pressed="false" aria-label="Tuesday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">T</button><button aria-pressed="false" aria-label="Wednesday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">W</button><button aria-pressed="false" aria-label="Thursday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">T</button><button aria-pressed="false" aria-label="Friday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">F</button><button aria-pressed="true" aria-label="Saturday" style="width:44px;height:44px;border-radius:50%;border:1px solid #15191A;background:#15191A;color:#F2F3EF;font-weight:600;font-size:15px;padding:0">S</button><button aria-pressed="false" aria-label="Sunday" style="width:44px;height:44px;border-radius:50%;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:15px;padding:0">S</button></div>
+<div style="font-size:14px;font-weight:500;color:#5E655F;margin:18px 0 8px">The next one is due</div>
+<div style="display:flex"><button aria-pressed="true" style="flex:1;min-width:0;height:44px;border:1px solid #15191A;background:#15191A;color:#F2F3EF;font-weight:600;font-size:14px;border-radius:10px 0 0 10px">After I finish it</button><button aria-pressed="false" style="flex:1;min-width:0;height:44px;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:14px;border-radius:0 10px 10px 0">On fixed days</button></div>
+<div style="font-size:13px;color:#5E655F;line-height:1.4;margin-top:8px">A set time after you finish. A missed chore never piles up.</div>
+<div style="font-size:14px;font-weight:500;color:#5E655F;margin:18px 0 8px">Ends</div>
+<div style="display:flex"><button aria-pressed="true" style="flex:1;min-width:0;height:44px;border:1px solid #15191A;background:#15191A;color:#F2F3EF;font-weight:600;font-size:14px;border-radius:10px 0 0 10px">Never</button><button aria-pressed="false" style="flex:1;min-width:0;height:44px;border:1px solid #868D87;background:#FAFAF8;color:#15191A;font-weight:600;font-size:14px;border-radius:0 10px 10px 0">On a date</button></div>
+<div style="margin-top:20px;padding-top:14px;border-top:1px solid #D6D9D3;font-size:15px;line-height:1.4">Repeats every week on Saturday, after you finish it.</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:16px"><a href="#top" style="flex:1;display:flex;align-items:center;justify-content:center;height:52px;border-radius:12px;background:#15191A;color:#F2F3EF;font-weight:600;font-size:16px">Done</a><button style="flex:none;height:52px;padding:0 8px;border:0;background:none;font-weight:600;font-size:15px;text-decoration:underline;text-underline-offset:3px">Remove repeat</button></div>
+</div>
+</div></div>
+</body>
+</html>

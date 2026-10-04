@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 to 5 done; Phase 4's reminders still need a test on a real phone over HTTPS.
+Status: Phases 0 to 6 done; Phase 4's reminders still need a test on a real phone over HTTPS.
 
 ## Decisions already made
 
@@ -147,16 +147,28 @@ Notes:
 - The quick "Repeat" select stays in Plan's "New task" form; the full picker is in the task sheet and panel.
 - Backups keep every database copy; pruning old ones is left to the owner (the README says so).
 
-## Phase 6: polish (not designed yet)
+## Phase 6: polish
 
-These were never drawn. Design them in the same style as `DESIGN.md` and show the user before building.
+Designed by the owner (the Phase 6 addendum, now merged into `DESIGN.md`; the drawings are in `mockups/`).
 
-- [ ] Dark theme (tokens are proposed in `DESIGN.md`; check contrast).
-- [ ] Empty, loading and error states for every screen.
-- [ ] Offline and sync-failed indicator.
+- [x] Account: a username besides the passphrase, a first-run Set up screen, and changing either from Settings (`0002_account.sql`, `docs/SPEC.md` sections 2, 4 and 7).
+- [x] Dark theme, with the light contrast fixes (`--muted`, the new `--border`).
+- [x] Empty, loading and error states for every screen.
+- [x] Offline and sync-failed indicator, phone and desktop.
 - [x] Phone Projects list, goal creation, and the repeat picker. (Done in Phases 3 and 5.)
-- [ ] Keyboard shortcuts on desktop (capture, switch screens).
-- [ ] Accessibility pass: focus order, screen reader labels, reduced motion.
+- [x] Keyboard shortcuts on desktop (capture, switch screens).
+- [x] Accessibility pass: focus order, screen reader labels, reduced motion.
+
+Notes:
+
+- **To confirm with the owner:** an install from before usernames gets its account from `HOMEBASE_PASSPHRASE_HASH` with the username `owner`, so nobody is locked out; it can be renamed in Settings. The variable is ignored once the account exists, so a passphrase changed in Settings survives a restart. Without the variable, a fresh install shows Set up, and whoever reaches it first creates the account; the README says to do it straight after starting.
+- Errors from the account endpoints carry a `field`, so each form shows the message under the right input. A refused login always names the passphrase field and never says which part was wrong. The change endpoints share the five-per-ten-minutes login limit.
+- `GET /api/me` now includes the username, so Log in can fill it in after a session ends, even offline. A session that ended keeps the local copy and its outbox; an explicit logout still empties them.
+- The theme choice is per device and must be read before the app's code loads, so it lives in `localStorage` (the only synchronous store) and is applied by `public/theme.js`. An inline script would be simpler but the Content-Security-Policy forbids it.
+- Base UI toasts are non-modal dialogs (`role="dialog"`, `aria-modal="false"`); the shortcut handler only stands down for modal ones.
+- "Loading" means the first sync after logging in has not finished (a `loaded` flag in IndexedDB). Devices that synced before the flag existed count as loaded.
+- The phone's Plan gained the plus button the mockups draw, opening the existing New task form in a sheet; without it the phone could not add a dated task from Plan.
+- Verified in headless Chromium against the built binary, at 390 and 1280 px: Set up with its errors, Log in, a wrong pair, the session-ended notice, both change dialogs (a wrong current passphrase, then success, after which Sessions listed only this browser), dark and light themes, the offline and failed-sync banners with Retry and "Back online. Synced.", every empty state on a fresh install, the skeleton while the first sync is held back, the error block when it fails and "Try again", a project that no longer exists, a 26 MB upload, and every shortcut. A script over every screen in both themes found no unnamed buttons, unlabelled fields, targets under 44 px or text under 4.5:1. Not verified: a real screen reader, and a real phone.
 
 ## Known risks
 
