@@ -1,6 +1,7 @@
 # Tests every push and pull request. Pushes to main publish
-# ghcr.io/<owner>/homebase:latest and :sha-<short>; a tag like v1.2.0 also
-# publishes :1.2.0. Plain docker commands, so no third-party actions.
+# ghcr.io/<owner>/homebase:latest and :sha-<short> for amd64 and arm64; a
+# tag like v1.2.0 publishes :1.2.0 instead of :latest. Plain docker
+# commands, so no third-party actions.
 name: CI and image
 
 on:
@@ -37,6 +38,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, for git describe
       - name: Log in to ghcr.io
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Build and push
@@ -48,7 +51,11 @@ jobs:
           else
             tags+=(-t "$image:latest")
           fi
-          docker build -f deploy/Dockerfile "${tags[@]}" \
+          # The default builder cannot hold two platforms; this one can.
+          docker buildx create --use --driver docker-container
+          docker buildx build --push --platform linux/amd64,linux/arm64 \
+            -f deploy/Dockerfile "${tags[@]}" \
+            --build-arg VERSION="$(git describe --tags --always)" \
+            --build-arg COMMIT="${GITHUB_SHA::7}" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" .
-          docker push --all-tags "$image"

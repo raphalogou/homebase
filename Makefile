@@ -4,6 +4,11 @@ SHELL := /bin/bash
 BIN   := bin/homebase
 EMBED := server/internal/webui/dist
 
+# Shown in Settings, About and by `homebase version`. A v* tag gives
+# "v1.2.0"; commits after it "v1.2.0-3-gabc1234"; no tag yet, the commit.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+
 .PHONY: help dev build test lint fmt ci clean
 
 help:
@@ -32,10 +37,11 @@ dev: web/node_modules
 	wait
 
 build: web/node_modules
-	cd web && npm run build
+	cd web && VITE_VERSION=$(VERSION) VITE_COMMIT=$(COMMIT) npm run build
 	find $(EMBED) -mindepth 1 ! -name .gitkeep -delete
 	cp -R web/dist/. $(EMBED)/
-	cd server && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../$(BIN) ./cmd/homebase
+	cd server && CGO_ENABLED=0 go build -trimpath \
+		-ldflags='-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)' -o ../$(BIN) ./cmd/homebase
 	@echo "built $(BIN)"
 
 test: lint
