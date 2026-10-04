@@ -20,13 +20,37 @@ type Rollover interface {
 // RolloverAt is the local time of day the rollover runs.
 const RolloverAt = 5 * time.Minute
 
+// Orphans is what the file clean-up needs.
+type Orphans interface {
+	OrphanFiles(ctx context.Context) ([]string, error)
+}
+
+// Remover deletes a stored file's bytes, reporting whether any were there.
+type Remover interface {
+	Remove(sha string) (bool, error)
+}
+
+// CleanEvery is how often unused files are looked for. The spec asks for
+// nightly; hourly is cheap and catches up after the server was off.
+const CleanEvery = time.Hour
+
 // Run checks once a tick until ctx ends. tick is a minute in production.
-func Run(ctx context.Context, log *slog.Logger, r Rollover, tick time.Duration) {
+func Run(ctx context.Context, log *slog.Logger, r Rollover, o Orphans, rm Remover, tick time.Duration) {
 	t := time.NewTicker(tick)
 	defer t.Stop()
+	var lastClean time.Time
 	for {
 		if err := runRollover(ctx, r); err != nil && ctx.Err() == nil {
 			log.Error("rollover", "err", err)
+		}
+		if time.Since(lastClean) >= CleanEvery {
+			lastClean = time.Now()
+			n, err := cleanFiles(ctx, o, rm)
+			if err != nil && ctx.Err() == nil {
+				log.Error("file clean-up", "err", err)
+			} else if n > 0 {
+				log.Info("file clean-up", "removed", n)
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -34,6 +58,26 @@ func Run(ctx context.Context, log *slog.Logger, r Rollover, tick time.Duration) 
 		case <-t.C:
 		}
 	}
+}
+
+func cleanFiles(ctx context.Context, o Orphans, rm Remover) (int, error) {
+	list, err := o.OrphanFiles(ctx)
+	if err != nil {
+		return 0, err
+	}
+	// Rows of cleaned files stay (tombstones point at them), so the list
+	// repeats; only count bytes actually removed.
+	n := 0
+	for _, sha := range list {
+		removed, err := rm.Remove(sha)
+		if err != nil {
+			return n, err
+		}
+		if removed {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func runRollover(ctx context.Context, r Rollover) error {

@@ -22,6 +22,7 @@ import (
 	"homebase/internal/auth"
 	"homebase/internal/config"
 	"homebase/internal/db"
+	"homebase/internal/files"
 	"homebase/internal/migrate"
 	"homebase/internal/push"
 	"homebase/internal/sched"
@@ -100,14 +101,19 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if _, err := push.LoadOrCreateKeys(cfg.DataDir); err != nil {
 		return err
 	}
+	blobs, err := files.New(cfg.DataDir)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.New(api.Deps{
-			Log:  log,
-			Auth: auth.New(st, hash, time.Now),
-			Sync: sy,
-			Web:  webui.Handler(),
+			Log:   log,
+			Auth:  auth.New(st, hash, time.Now),
+			Sync:  sy,
+			Blobs: blobs,
+			Web:   webui.Handler(),
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Generous enough for a 25 MB upload on a slow phone connection.
@@ -119,7 +125,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 
 	jobs, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
-	go sched.Run(jobs, log, sy, time.Minute)
+	go sched.Run(jobs, log, sy, sy, blobs, time.Minute)
 
 	errc := make(chan error, 1)
 	go func() {

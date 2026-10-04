@@ -11,6 +11,7 @@ import (
 
 	"homebase/internal/apperr"
 	"homebase/internal/auth"
+	"homebase/internal/files"
 	"homebase/internal/syncer"
 )
 
@@ -19,6 +20,8 @@ type Deps struct {
 	Log  *slog.Logger
 	Auth *auth.Auth
 	Sync *syncer.Syncer
+	// Blobs holds uploaded files.
+	Blobs *files.Blobs
 	// Web serves the built web app for every path that is not an API route.
 	Web http.Handler
 }
@@ -39,6 +42,8 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /api/sync", s.session(http.HandlerFunc(s.handlePull)))
 	mux.Handle("POST /api/sync", s.writeChecks(s.session(http.HandlerFunc(s.handlePush))))
 	mux.Handle("POST /api/promote", s.writeChecks(s.session(http.HandlerFunc(s.handlePromote))))
+	mux.Handle("POST /api/files", s.uploadChecks(s.session(http.HandlerFunc(s.handleUpload))))
+	mux.Handle("GET /api/files/{sha}", s.session(http.HandlerFunc(s.handleFile)))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, apperr.New(apperr.NotFound, "No such endpoint."))

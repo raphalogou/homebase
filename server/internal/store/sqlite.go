@@ -314,6 +314,30 @@ func (t *sqliteTx) FileExists(sha string) (bool, error) {
 	return n > 0, err
 }
 
+func (t *sqliteTx) InsertFile(f File) error {
+	return t.exec(`INSERT INTO files(sha, mime, size, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(sha) DO NOTHING`,
+		f.SHA, f.Mime, f.Size, f.CreatedAt)
+}
+
+func (t *sqliteTx) File(sha string) (File, error) {
+	var f File
+	err := t.row(`SELECT sha, mime, size, created_at FROM files WHERE sha = ?`, sha).
+		Scan(&f.SHA, &f.Mime, &f.Size, &f.CreatedAt)
+	return f, notFound(err)
+}
+
+func (t *sqliteTx) OrphanFiles(cutoff int64) ([]string, error) {
+	return queryAll(t, `SELECT sha FROM files f WHERE f.created_at < ?
+		AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.file_sha = f.sha
+			AND (a.deleted_at IS NULL OR a.updated_at >= ?))
+		ORDER BY sha`,
+		func(sc interface{ Scan(...any) error }) (string, error) {
+			var s string
+			err := sc.Scan(&s)
+			return s, err
+		}, cutoff, cutoff)
+}
+
 // Changes
 
 func (t *sqliteTx) ChangesSince(since int64, limit int) (Changes, bool, int64, error) {

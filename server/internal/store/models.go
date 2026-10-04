@@ -86,6 +86,14 @@ type Reminder struct {
 	Rev       int64  `json:"rev"`
 }
 
+// File is a row of the files table; it is not synced.
+type File struct {
+	SHA       string
+	Mime      string
+	Size      int64
+	CreatedAt int64
+}
+
 type Settings struct {
 	TZ            string
 	WeekStart     int

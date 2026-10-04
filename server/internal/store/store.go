@@ -62,6 +62,12 @@ type Tx interface {
 	TasksOfProject(projectID string) ([]Task, error)
 	AttachmentsOf(kind OwnerKind, ownerID string) ([]Attachment, error)
 	FileExists(sha string) (bool, error)
+	// InsertFile records a stored file; recording the same file again is a no-op.
+	InsertFile(f File) error
+	File(sha string) (File, error)
+	// OrphanFiles lists files created before cutoff that no live attachment
+	// uses and no attachment changed after cutoff.
+	OrphanFiles(cutoff int64) ([]string, error)
 
 	// ChangesSince returns synced rows with rev > since, oldest first. With
 	// limit > 0 it returns at most limit rows, and more reports whether rows

@@ -62,3 +62,27 @@ func TestRunRollover(t *testing.T) {
 		})
 	}
 }
+
+type fakeOrphans []string
+
+func (f fakeOrphans) OrphanFiles(context.Context) ([]string, error) { return f, nil }
+
+type fakeBlobs map[string]bool
+
+func (f fakeBlobs) Remove(sha string) (bool, error) {
+	had := f[sha]
+	delete(f, sha)
+	return had, nil
+}
+
+func TestCleanFilesCountsOnlyRemovedBytes(t *testing.T) {
+	blobs := fakeBlobs{"a": true}
+	n, err := cleanFiles(context.Background(), fakeOrphans{"a", "b"}, blobs)
+	if err != nil || n != 1 {
+		t.Fatalf("first run = %d, %v; want 1", n, err)
+	}
+	n, err = cleanFiles(context.Background(), fakeOrphans{"a", "b"}, blobs)
+	if err != nil || n != 0 {
+		t.Fatalf("second run = %d, %v; want 0", n, err)
+	}
+}

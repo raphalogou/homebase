@@ -419,6 +419,7 @@ func TestValidation(t *testing.T) {
 		{"bad weekdays", upsert("repeats", id(1), ms(start), store.Repeat{Freq: "week", Every: 1, Mode: "fixed", Weekdays: ptr(128)})},
 		{"link without url", upsert("attachments", id(1), ms(start), store.Attachment{Kind: "link"})},
 		{"javascript link", upsert("attachments", id(1), ms(start), store.Attachment{Kind: "link", URL: ptr("javascript:alert(1)")})},
+		{"attachment with two owners", upsert("attachments", id(1), ms(start), store.Attachment{Kind: "note", Body: ptr("x"), TaskID: ptr(id(2)), GoalID: ptr(id(3))})},
 		{"attachment without owner", upsert("attachments", id(1), ms(start), store.Attachment{Kind: "note", Body: ptr("x")})},
 		{"file not uploaded", upsert("attachments", id(1), ms(start), store.Attachment{Kind: "file", FileSHA: ptr("aa"), TaskID: ptr(id(2))})},
 		{"cascade on upsert", Op{Op: "upsert", Table: "tasks", ID: id(1), Row: []byte(`{"title":"t"}`), UpdatedAt: ms(start), Cascade: "delete"}},

@@ -13,6 +13,7 @@ import (
 
 	"homebase/internal/auth"
 	"homebase/internal/db"
+	"homebase/internal/files"
 	"homebase/internal/migrate"
 	"homebase/internal/store"
 	"homebase/internal/syncer"
@@ -46,11 +47,16 @@ func newServer(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	web := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("web")) })
+	blobs, err := files.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	return New(Deps{
-		Log:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Auth: auth.New(st, hash, time.Now),
-		Sync: sy,
-		Web:  web,
+		Blobs: blobs,
+		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Auth:  auth.New(st, hash, time.Now),
+		Sync:  sy,
+		Web:   web,
 	})
 }
 

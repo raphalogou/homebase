@@ -258,6 +258,9 @@ All of these live on the server so every device sees the same result.
 - Stored at `data/files/ab/cd/<sha256>`, never under a user-chosen name.
 - Served with `X-Content-Type-Options: nosniff`. Images and PDFs inline with `Content-Security-Policy: default-src 'none'; sandbox`. Everything else as a download.
 - A nightly job deletes files with no live attachment older than 7 days.
+- **Details.** The type is sniffed from the content, never taken from the client. Inline types are PNG, JPEG, GIF, WebP, BMP and PDF; SVG and everything else download as `application/octet-stream`. Every file response carries `Content-Security-Policy: default-src 'none'; sandbox` and `Cache-Control: private, max-age=31536000, immutable`, since the URL is the content's hash. `GET /api/files/{sha}?name=...` sets the download name; `HEAD` gives type and size.
+- **Upload.** `POST /api/files` needs the session, `X-Homebase: 1` and `multipart/form-data`; fields may come before or after the file, and the answer is `201` with the attachment row. The owner must be a live goal, project or task (`404` otherwise). If the attachment cannot be created, bytes no other attachment uses are deleted at once.
+- **Clean-up.** The job runs hourly and skips files whose attachments changed in the last 7 days. It deletes only the bytes: the `files` row stays, because tombstoned attachments still refer to it, and uploading the same file again restores the bytes.
 
 ### Calendar feed
 
