@@ -4,7 +4,8 @@ import { AddField } from "@/components/add-field";
 import { Columns } from "@/components/app-shell";
 import { GoalsIcon } from "@/components/icons";
 import { ProjectRow } from "@/components/project-row";
-import { Empty, ScreenTitle, SectionHeading } from "@/components/section";
+import { ScreenTitle, SectionHeading } from "@/components/section";
+import { EmptyBlock, FirstLoad, SkeletonRows } from "@/components/states";
 import { Label, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { useOpenGoals, useTasks } from "@/data/hooks";
@@ -48,33 +49,63 @@ export default function PlanProjects() {
         onChange={(v) => v === "tasks" && navigate("/plan")}
       />
       <div className="mt-8">
-        {groups.length === 0 && (
-          <Empty>No projects yet. Add one to group the tasks of a bigger piece of work.</Empty>
-        )}
-        {groups.map((g) => (
-          <section key={g.key} aria-label={g.title || "Projects without a goal"} className="mb-10">
-            <h2
-              className={
-                g.title
-                  ? "mb-2 flex items-center gap-2.5 font-serif text-xl/[1.25]"
-                  : "mb-2 text-sm font-semibold text-muted-foreground"
-              }
+        <FirstLoad
+          what="projects"
+          skeleton={<SkeletonRows kind="line" label="Loading your projects" />}
+        >
+          {groups.length === 0 && (
+            <EmptyBlock
+              title="No projects yet."
+              action={{ label: "Add a project", onClick: focusAddProject }}
             >
-              {g.title && <GoalsIcon size={20} className="shrink-0" />}
-              {g.title || "Without a goal"}
-            </h2>
-            <ul>
-              {g.list.map((p) => (
-                <ProjectRow key={p.id} project={p} tasks={tasks} />
-              ))}
-            </ul>
-          </section>
-        ))}
+              A project groups tasks toward a goal, like a trip or a course.
+            </EmptyBlock>
+          )}
+          {groups.map((g) => (
+            <section
+              key={g.key}
+              aria-label={g.title || "Projects without a goal"}
+              className="mb-10"
+            >
+              <h2
+                className={
+                  g.title
+                    ? "mb-2 flex items-center gap-2.5 font-serif text-xl/[1.25]"
+                    : "mb-2 text-sm font-semibold text-muted-foreground"
+                }
+              >
+                {g.title && <GoalsIcon size={20} className="shrink-0" />}
+                {g.title || "Without a goal"}
+              </h2>
+              <ul>
+                {g.list.map((p) => (
+                  <ProjectRow key={p.id} project={p} tasks={tasks} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </FirstLoad>
       </div>
-      {!desktop && <AddProjectForm />}
+      {!desktop && (
+        <div className="mt-10">
+          <AddProjectForm />
+        </div>
+      )}
     </>
   );
   return <Columns main={main} side={<AddProjectForm />} />;
+}
+
+const ADD_PROJECT = "add-project";
+
+// The form is always on screen (the right column, or under the list on the
+// phone), so the empty state's button brings the person to it.
+function focusAddProject() {
+  const field = document.querySelector<HTMLInputElement>(
+    `#${ADD_PROJECT} input[type="text"], #${ADD_PROJECT} input:not([type])`,
+  );
+  field?.scrollIntoView({ block: "center" });
+  field?.focus();
 }
 
 function AddProjectForm() {
@@ -83,7 +114,7 @@ function AddProjectForm() {
   const [goalId, setGoalId] = useState("");
   const id = useId();
   return (
-    <section aria-labelledby={`${id}-h`} className="flex flex-col gap-4">
+    <section id={ADD_PROJECT} aria-labelledby={`${id}-h`} className="flex flex-col gap-4">
       <SectionHeading id={`${id}-h`} className="mb-0">
         Add a project
       </SectionHeading>

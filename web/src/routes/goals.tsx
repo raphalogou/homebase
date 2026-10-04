@@ -1,7 +1,8 @@
 import { AddField } from "@/components/add-field";
 import { Columns } from "@/components/app-shell";
 import { GoalList } from "@/components/goal-list";
-import { Empty, ScreenTitle } from "@/components/section";
+import { ScreenTitle } from "@/components/section";
+import { EmptyBlock, FirstLoad, SkeletonRows } from "@/components/states";
 import { useOpenGoals } from "@/data/hooks";
 import { useStructureActions } from "@/data/structure";
 
@@ -14,7 +15,18 @@ export default function Goals() {
         <>
           <ScreenTitle>Goals</ScreenTitle>
           <div className="mt-8">
-            {goals.length === 0 ? <Empty>No goals yet. Write one below.</Empty> : <GoalList />}
+            <FirstLoad
+              what="goals"
+              skeleton={<SkeletonRows kind="line" count={3} label="Loading your goals" />}
+            >
+              {goals.length === 0 ? (
+                <EmptyBlock serif title="No goals yet.">
+                  A goal is the reason behind your tasks. Start with one or two.
+                </EmptyBlock>
+              ) : (
+                <GoalList />
+              )}
+            </FirstLoad>
           </div>
           {/* Approved design: the new goal field sits under the list, in the serif. */}
           <div className="mt-10">

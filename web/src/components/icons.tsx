@@ -29,6 +29,7 @@ import {
   type LucideProps,
   NotebookPen,
   Paperclip,
+  Plus,
   RefreshCw,
   Repeat,
   Settings,
@@ -85,3 +86,4 @@ export const SyncedIcon = icon(CircleCheck);
 export const SyncingIcon = icon(RefreshCw);
 export const KeyboardIcon = icon(Keyboard);
 export const LogOutIcon = icon(LogOut);
+export const AddIcon = icon(Plus);

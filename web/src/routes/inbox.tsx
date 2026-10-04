@@ -13,6 +13,7 @@ import {
   TodayIcon,
 } from "@/components/icons";
 import { Empty, ScreenTitle, SectionHeading } from "@/components/section";
+import { EmptyBlock, FirstLoad, SkeletonRows } from "@/components/states";
 import { TaskRow } from "@/components/task-row";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
@@ -46,12 +47,20 @@ export default function Inbox() {
           <CaptureBar />
         </div>
       )}
-      <ul className="mt-6">
-        {items.map((t) => (
-          <InboxItem key={t.id} task={t} />
-        ))}
-      </ul>
-      {items.length === 0 && <Empty>Nothing waiting. New tasks you capture land here.</Empty>}
+      <div className="mt-6">
+        <FirstLoad what="tasks" skeleton={<SkeletonRows count={3} label="Loading your inbox" />}>
+          <ul>
+            {items.map((t) => (
+              <InboxItem key={t.id} task={t} />
+            ))}
+          </ul>
+          {items.length === 0 && (
+            <EmptyBlock title="Inbox is clear.">
+              Anything you capture lands here until you place it.
+            </EmptyBlock>
+          )}
+        </FirstLoad>
+      </div>
       {!desktop && <CaptureBar fixed />}
     </>
   );

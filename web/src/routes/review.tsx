@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Columns } from "@/components/app-shell";
 import { CheckIcon, NoticeIcon } from "@/components/icons";
 import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
+import { ErrorBlock, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
@@ -32,23 +33,26 @@ function weeksAgo(ms: number): string {
 // DESIGN.md "Weekly review": a one-sentence summary in the serif, Gone quiet
 // with Keep, Pause and Drop, Next week, and Finish review.
 export default function Review() {
-  const [review] = useReview();
+  const [review, reload] = useReview();
 
   const main = (
     <>
       <ScreenTitle>Weekly review</ScreenTitle>
       {review.state === "loading" && (
-        <p className="mt-4 text-muted-foreground">Gathering the week.</p>
-      )}
-      {review.state === "offline" && (
         <div className="mt-8">
-          <Empty>The review needs a connection. Try again when online.</Empty>
+          <SkeletonRows kind="line" count={3} label="Gathering the week" />
         </div>
       )}
-      {review.state === "error" && (
-        <div className="mt-8">
-          <Empty>{review.message}</Empty>
-        </div>
+      {(review.state === "offline" || review.state === "error") && (
+        <ErrorBlock
+          className="mt-8"
+          title="Could not load the review"
+          action={{ label: "Try again", onClick: reload }}
+        >
+          {review.state === "offline"
+            ? "The review is worked out on the server. Check your connection, then try again."
+            : review.message}
+        </ErrorBlock>
       )}
       {review.state === "ready" && <ReviewBody summary={review.data} />}
     </>
@@ -91,7 +95,7 @@ function ReviewBody({ summary }: { summary: ReviewSummary }) {
       <section aria-labelledby="quiet" className="mt-10">
         <SectionLabel id="quiet">Gone quiet</SectionLabel>
         {summary.quiet.length === 0 ? (
-          <Empty>Nothing has gone quiet.</Empty>
+          <Empty>Nothing has gone quiet this week.</Empty>
         ) : (
           <ul>
             {summary.quiet.map((q) => (

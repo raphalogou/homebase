@@ -1,8 +1,9 @@
 import { type FormEvent, useId, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Columns } from "@/components/app-shell";
-import { CheckIcon, NoticeIcon } from "@/components/icons";
-import { Empty, ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
+import { AddIcon, CheckIcon, NoticeIcon } from "@/components/icons";
+import { ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
+import { EmptyBlock, FirstLoad, SkeletonRows } from "@/components/states";
 import {
   ParentOptions,
   parsedParent,
@@ -15,11 +16,13 @@ import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { Sheet } from "@/components/ui/sheet";
 import { WeekStrip } from "@/components/week-strip";
 import { ActionError, useActions, useTasks, useToday, useWeekStart } from "@/data/hooks";
 import { dayOf } from "@/data/rules";
 import type { LocalDate, Task } from "@/data/types";
 import { addDays, dayHeading, isDate, longDate, startOfWeek } from "@/lib/dates";
+import { useIsDesktop } from "@/lib/use-media";
 
 type Filter = "all" | "week" | "standalone" | "repeating";
 
@@ -43,6 +46,8 @@ export default function Plan() {
   const actions = useActions();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("all");
+  const [adding, setAdding] = useState(false);
+  const desktop = useIsDesktop();
   const [params, setParams] = useSearchParams();
   const dayParam = params.get("day");
   const day: LocalDate | null = dayParam && isDate(dayParam) ? dayParam : null;
@@ -99,9 +104,29 @@ export default function Plan() {
     return out;
   }, [tasks, today, weekStart, filter, day]);
 
+  const empty = day ? (
+    <EmptyBlock title="Nothing on this day." />
+  ) : tasks.length > 0 ? (
+    <EmptyBlock title="No tasks match this filter." />
+  ) : desktop ? (
+    <EmptyBlock title="No tasks here.">
+      Type one in the New task form, or capture it from Today.
+    </EmptyBlock>
+  ) : (
+    <EmptyBlock title="Nothing planned.">Use the plus to add a task.</EmptyBlock>
+  );
+
   const main = (
     <>
-      <ScreenTitle>Plan</ScreenTitle>
+      <div className="flex items-start justify-between gap-4">
+        <ScreenTitle>Plan</ScreenTitle>
+        {/* The phone has no right column, so the New task form opens in a sheet. */}
+        {!desktop && (
+          <Button variant="icon" aria-label="Add task" onClick={() => setAdding(true)}>
+            <AddIcon />
+          </Button>
+        )}
+      </div>
       <Segmented
         label="Show"
         className="mt-6 max-w-80"
@@ -138,31 +163,34 @@ export default function Plan() {
         </div>
       )}
       <div className="mt-6">
-        {groups.length === 0 && (
-          <Empty>
-            {day ? "Nothing on this day." : "No tasks here. Capture one on Today or in the Inbox."}
-          </Empty>
-        )}
-        {groups.map((g) => (
-          <section key={g.key} aria-label={g.heading} className="mb-8">
-            <SectionLabel>{g.heading}</SectionLabel>
-            <ul>
-              {g.tasks.map((t) => (
-                <li key={t.id}>
-                  <TaskRow task={t} onToggle={() => void actions.toggleDone(t.id)} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        <FirstLoad what="tasks" skeleton={<SkeletonRows count={3} label="Loading your tasks" />}>
+          {groups.length === 0 && empty}
+          {groups.map((g) => (
+            <section key={g.key} aria-label={g.heading} className="mb-8">
+              <SectionLabel>{g.heading}</SectionLabel>
+              <ul>
+                {g.tasks.map((t) => (
+                  <li key={t.id}>
+                    <TaskRow task={t} onToggle={() => void actions.toggleDone(t.id)} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </FirstLoad>
       </div>
+      {!desktop && (
+        <Sheet open={adding} onOpenChange={setAdding} title="New task">
+          <NewTaskForm onAdded={() => setAdding(false)} />
+        </Sheet>
+      )}
     </>
   );
 
   return <Columns main={main} side={<NewTaskForm />} />;
 }
 
-function NewTaskForm() {
+function NewTaskForm({ onAdded }: { onAdded?: () => void }) {
   const actions = useActions();
   const id = useId();
   const [title, setTitle] = useState("");
@@ -184,6 +212,7 @@ function NewTaskForm() {
       setDay("");
       setRepeat("none");
       notify({ title: `Added “${title.trim()}”`, icon: CheckIcon });
+      onAdded?.();
     } catch (err) {
       if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
       else throw err;

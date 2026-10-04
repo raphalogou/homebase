@@ -37,6 +37,7 @@ export function Attachments({
   const [adding, setAdding] = useState<Adding>(null);
   const notify = useNotify();
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<{ name: string; message: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const headingId = useId();
@@ -52,10 +53,19 @@ export function Attachments({
     }
   }
 
+  // A failed upload stays under the buttons, with the file's name, until the
+  // next try; a toast would be gone before the person reads which file it was.
   async function uploadAll(files: FileList | File[]) {
     setBusy(true);
+    setFailed(null);
     for (const f of Array.from(files)) {
-      if (!(await run(() => actions.upload(owner, f)))) break;
+      try {
+        await actions.upload(owner, f);
+      } catch (err) {
+        if (!(err instanceof ActionError)) throw err;
+        setFailed({ name: f.name, message: err.message });
+        break;
+      }
       notify({ title: `Uploaded ${f.name}`, icon: AttachmentIcon });
     }
     setBusy(false);
@@ -70,6 +80,11 @@ export function Attachments({
   return (
     <section aria-labelledby={headingId}>
       <SectionLabel id={headingId}>{heading}</SectionLabel>
+      {list.length === 0 && adding === null && (
+        <p className="border-t border-line pt-3 text-muted-foreground">
+          Links, notes and files for this item.
+        </p>
+      )}
       {list.length > 0 && (
         <ul>
           {list.map((a) => (
@@ -144,6 +159,16 @@ export function Attachments({
           }}
         />
       </div>
+
+      {failed && (
+        <div className="mt-3 flex gap-2.5" role="alert">
+          <NoticeIcon size={18} className="mt-[3px] shrink-0" />
+          <p>
+            <strong className="block font-semibold">{failed.name} did not upload</strong>
+            <span className="text-muted-foreground">{failed.message}</span>
+          </p>
+        </div>
+      )}
 
       {desktop && (
         <button

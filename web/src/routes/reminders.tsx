@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Columns } from "@/components/app-shell";
 import { CheckIcon, NoticeIcon, RemindersIcon } from "@/components/icons";
 import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
+import { FirstLoad, InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
@@ -41,11 +42,18 @@ export default function Reminders() {
         {zone ? ` Times are in ${zone.replace(/_/g, " ")}.` : ""}
       </p>
 
-      <ul className="mt-8">
-        {reminders.map((r) => (
-          <Slot key={r.slot} reminder={r} run={run} />
-        ))}
-      </ul>
+      <div className="mt-8">
+        <FirstLoad
+          what="reminders"
+          skeleton={<SkeletonRows kind="line" count={3} label="Loading your reminders" />}
+        >
+          <ul>
+            {reminders.map((r) => (
+              <Slot key={r.slot} reminder={r} />
+            ))}
+          </ul>
+        </FirstLoad>
+      </div>
 
       <ThisDevice run={run} />
     </>
@@ -55,52 +63,64 @@ export default function Reminders() {
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
 
-function Slot({ reminder, run }: { reminder: Reminder; run: Run }) {
+// A failed save shows under its own slot, and the slot goes back to the
+// saved value, so the screen never shows a time that is not in effect.
+function Slot({ reminder }: { reminder: Reminder }) {
   const save = useSaveReminder();
   const [time, setTime] = useState(reminder.atLocal);
+  const [failed, setFailed] = useState("");
   const id = useId();
   const kind = KINDS[reminder.kind];
   useEffect(() => setTime(reminder.atLocal), [reminder.atLocal]);
 
-  const commit = (patch: Partial<Reminder>) =>
-    run(() =>
-      save({
+  const commit = async (patch: Partial<Reminder>) => {
+    setFailed("");
+    try {
+      await save({
         slot: reminder.slot,
         enabled: patch.enabled ?? reminder.enabled,
         atLocal: patch.atLocal ?? reminder.atLocal,
         kind: reminder.kind,
-      }),
-    );
+      });
+    } catch (err) {
+      if (!(err instanceof ActionError)) throw err;
+      setTime(reminder.atLocal);
+      setFailed(`Could not save that change. ${err.message}`);
+    }
+  };
 
   return (
-    <li className="flex items-center gap-4 border-t border-line py-4">
-      <div className="min-w-0 flex-1">
-        <label htmlFor={id} className="sr-only">
-          {kind.name} time
-        </label>
-        <input
-          id={id}
-          type="time"
-          value={time}
-          onChange={(e) => {
-            // A complete time saves at once; phones pick it in a dialog.
-            const v = e.target.value;
-            setTime(v);
-            if (/^\d{2}:\d{2}$/.test(v) && v !== reminder.atLocal) void commit({ atLocal: v });
-          }}
-          onBlur={() => {
-            if (!/^\d{2}:\d{2}$/.test(time)) setTime(reminder.atLocal);
-          }}
-          className={`-ml-1 rounded-md bg-transparent px-1 text-[34px]/[1.1] font-semibold tabular-nums ${reminder.enabled ? "" : "text-muted-foreground"}`}
+    <li className="border-t border-line py-4">
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={id} className="sr-only">
+            {kind.name} time
+          </label>
+          <input
+            id={id}
+            type="time"
+            value={time}
+            onChange={(e) => {
+              // A complete time saves at once; phones pick it in a dialog.
+              const v = e.target.value;
+              setTime(v);
+              if (/^\d{2}:\d{2}$/.test(v) && v !== reminder.atLocal) void commit({ atLocal: v });
+            }}
+            onBlur={() => {
+              if (!/^\d{2}:\d{2}$/.test(time)) setTime(reminder.atLocal);
+            }}
+            className={`-ml-1 rounded-md bg-transparent px-1 text-[34px]/[1.1] font-semibold tabular-nums ${reminder.enabled ? "" : "text-muted-foreground"}`}
+          />
+          <p className="mt-1 font-semibold">{kind.name}</p>
+          <p className="text-[13px] text-muted-foreground">{kind.text}</p>
+        </div>
+        <ToggleSwitch
+          label={`${kind.name} at ${reminder.atLocal}`}
+          checked={reminder.enabled}
+          onChange={(on) => void commit({ enabled: on })}
         />
-        <p className="mt-1 font-semibold">{kind.name}</p>
-        <p className="text-[13px] text-muted-foreground">{kind.text}</p>
       </div>
-      <ToggleSwitch
-        label={`${kind.name} at ${reminder.atLocal}`}
-        checked={reminder.enabled}
-        onChange={(on) => void commit({ enabled: on })}
-      />
+      {failed && <InlineError>{failed}</InlineError>}
     </li>
   );
 }

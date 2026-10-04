@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { SyncIndicator } from "@/data/sync-indicator";
-import { useSyncIndicator } from "@/data/sync-status";
+import { useFirstLoad, useSyncIndicator } from "@/data/sync-status";
 import { useIsDesktop } from "@/lib/use-media";
 import { type IconProps, NoticeIcon, OfflineIcon, SyncedIcon, SyncingIcon } from "./icons";
 import { Button } from "./ui/button";
@@ -45,7 +45,9 @@ function message(i: SyncIndicator, device: string): Message | null {
 export function SyncBanner() {
   const { indicator, retry } = useSyncIndicator();
   const desktop = useIsDesktop();
-  const m = message(indicator, desktop ? "computer" : "phone");
+  const { loading } = useFirstLoad();
+  // With nothing on screen yet, the page's own error block explains instead.
+  const m = loading ? null : message(indicator, desktop ? "computer" : "phone");
   return (
     <div role="status" aria-live="polite">
       {m && (
