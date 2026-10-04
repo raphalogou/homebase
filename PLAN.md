@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 and 1 done.
+Status: Phases 0 to 2 done.
 
 ## Decisions already made
 
@@ -59,17 +59,29 @@ Notes:
 
 ## Phase 2: daily loop (web)
 
-- [ ] Local data layer: IndexedDB mirror of all synced tables, an outbox, and the sync scheduler from section 3. Expose hooks such as `useTasks`, `useToday`. No component talks to `fetch` directly.
-- [ ] App shell: phone bottom bar (Today, Inbox, Plan, Goals) and desktop left rail, as in `DESIGN.md`.
-- [ ] Login screen.
-- [ ] **Today:** goals as quiet lines, Your three (highlighter, rank, done state), capture bar, review link from Friday. Desktop: drag handle reorder. Phone: long-press drag plus up and down buttons in the task sheet.
-- [ ] **Choose up to three** picker (phone) and the suggestions list (desktop): due soon, in progress, moved a few times.
-- [ ] **Inbox:** sort with Today, Date, Goal, Project buttons (Project uses `/api/promote`).
-- [ ] **Plan, Tasks:** week strip, filters (Everything, Due this week, Standalone, Repeating), grouped list, new-task form on desktop.
-- [ ] Task sheet (phone) and panel (desktop): title, status, due, planned day, goal or project, repeat, notes.
-- [ ] Service worker via `vite-plugin-pwa` (`injectManifest`), manifest, install prompt, offline shell.
+- [x] Local data layer: IndexedDB mirror of all synced tables, an outbox, and the sync scheduler from section 3. Expose hooks such as `useTasks`, `useToday`. No component talks to `fetch` directly.
+- [x] App shell: phone bottom bar (Today, Inbox, Plan, Goals) and desktop left rail, as in `DESIGN.md`.
+- [x] Login screen.
+- [x] **Today:** goals as quiet lines, Your three (highlighter, rank, done state), capture bar, review link from Friday (moved to Phase 5 with the review itself). Desktop: drag handle reorder. Phone: long-press drag plus up and down buttons in the task sheet.
+- [x] **Choose up to three** picker (phone) and the suggestions list (desktop): due soon, in progress, moved a few times.
+- [x] **Inbox:** sort with Today, Date, Goal, Project buttons (Project uses `/api/promote`).
+- [x] **Plan, Tasks:** week strip, filters (Everything, Due this week, Standalone, Repeating), grouped list, new-task form on desktop.
+- [x] Task sheet (phone) and panel (desktop): title, status, due, planned day, goal or project, repeat, notes.
+- [x] Service worker via `vite-plugin-pwa` (`injectManifest`), manifest, install prompt, offline shell.
 
 **Done when:** with the network off you can capture, plan three tasks, complete one and reorder; turning the network on syncs everything to a second browser. Lighthouse PWA installability passes.
+
+Notes:
+
+- Verified in headless Firefox, driven over WebDriver BiDi against the built binary: the login flow (including a wrong passphrase); every screen at 390 px and 1280 px; and the "Done when" run. With the server stopped, the app opened from the service worker; a task was captured, one completed, a third planned and the three reordered with the keyboard. After the server came back, the outbox drained, and a second, fresh browser showed the same three in the same order plus the captured task.
+- Not verified here: Lighthouse (no Chrome on this machine), long-press drag on a touch screen, mouse dragging of the grip, and a real Android phone. The manifest and worker meet Chrome's installability rules on inspection (name, 192 and 512 px icons, maskable icon, standalone, start URL, a worker with a fetch handler).
+- Login screen designed as approved: the same top-aligned column as the other screens.
+- UI primitives use Base UI (`@base-ui/react`): Dialog for the bottom sheet, ToggleGroup for the segmented control. Selects are native, which suits phones best. Icons are inline SVG; lucide is not installed.
+- The app icon (a bold H on the highlighter, as for notifications in `DESIGN.md`) is new and worth a look: `web/public/icon-512.png`.
+- Promote uses `/api/promote` when online with an empty outbox; otherwise it queues the same change as ordinary ops (new project, attachments moved, task deleted), which the server also applies in one transaction.
+- Deferred to their phases: the Weekly review and Reminders rail items, Today's review link (Phase 5), and the Tasks/Projects switch on Plan (Phase 3). Goal creation has no screen yet (Phase 6), so the Inbox Goal button only lists existing goals.
+- The service worker serves the cached shell first, so a new build shows on the second open after a deploy.
+- A failing install was caught in testing: the plugin listed the manifest and icons twice, and `cache.addAll` rejects duplicates. The worker now removes duplicates itself.
 
 ## Phase 3: goals, projects, attachments
 
