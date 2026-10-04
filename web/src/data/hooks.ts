@@ -341,6 +341,16 @@ export function useActions() {
 }
 
 export function useAuth() {
-  const { auth, login, logout } = useData();
-  return { auth, login, logout };
+  const { auth, login, setup, logout, store } = useData();
+  useVersion();
+  return {
+    auth,
+    login,
+    setup,
+    logout,
+    // Logging out empties the local copy; a session that ended keeps it, and
+    // its outbox, until the next login sends it.
+    sessionEnded: auth === "signedOut" && (store.rev > 0 || store.outbox.size > 0),
+    lastUsername: store.me?.username ?? "",
+  };
 }

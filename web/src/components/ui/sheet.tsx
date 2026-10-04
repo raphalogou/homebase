@@ -8,6 +8,8 @@ interface SheetProps {
   title: string;
   /** Show the title visibly; otherwise it is only for screen readers. */
   showTitle?: boolean;
+  /** One muted sentence under a shown title. */
+  description?: string | undefined;
   children: ReactNode;
   className?: string;
 }
@@ -19,13 +21,14 @@ export function Sheet({
   onOpenChange,
   title,
   showTitle = false,
+  description,
   children,
   className,
 }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/30 transition-opacity duration-[180ms] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-veil transition-opacity duration-[180ms] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Dialog.Popup
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-[20px] bg-bg px-6 pb-[max(24px,env(safe-area-inset-bottom))] transition-transform duration-[180ms] ease-out data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
@@ -36,9 +39,20 @@ export function Sheet({
             aria-hidden="true"
             className="mx-auto mt-2.5 mb-3 h-1 w-10 shrink-0 rounded-full bg-dashed"
           />
-          <Dialog.Title className={showTitle ? "mb-4 text-[30px]/[1.15] font-bold" : "sr-only"}>
+          <Dialog.Title
+            className={
+              showTitle
+                ? cn("text-[30px]/[1.15] font-bold", description ? "mb-1" : "mb-4")
+                : "sr-only"
+            }
+          >
             {title}
           </Dialog.Title>
+          {description && (
+            <Dialog.Description className="mb-5 text-muted-foreground">
+              {description}
+            </Dialog.Description>
+          )}
           <div className="-mx-6 overflow-y-auto px-6">{children}</div>
         </Dialog.Popup>
       </Dialog.Portal>

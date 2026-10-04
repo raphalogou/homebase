@@ -12,13 +12,15 @@ import { openDatabase } from "./idb.ts";
 import { LocalStore } from "./store.ts";
 import { SyncEngine } from "./sync.ts";
 
-export type AuthState = "loading" | "signedOut" | "signedIn";
+/** "setup": a fresh install, where the account still has to be made. */
+export type AuthState = "loading" | "setup" | "signedOut" | "signedIn";
 
 interface DataContext {
   store: LocalStore;
   engine: SyncEngine;
   auth: AuthState;
-  login: (passphrase: string) => Promise<void>;
+  login: (username: string, passphrase: string) => Promise<void>;
+  setup: (username: string, passphrase: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -70,7 +72,10 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
         setAuth("signedIn");
         engine.start();
       } catch {
-        if (!cancelled) setAuth("signedOut");
+        // Only a reachable server can say it needs setting up; offline,
+        // Log in explains that it cannot reach it.
+        const needed = await api.setupNeeded().catch(() => false);
+        if (!cancelled) setAuth(needed ? "setup" : "signedOut");
       }
     })();
 
@@ -80,10 +85,10 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     };
   }, []);
 
-  const login = useCallback(
-    async (passphrase: string) => {
+  const signIn = useCallback(
+    async (start: () => Promise<void>) => {
       if (!ready) return;
-      await api.login(passphrase);
+      await start();
       const me = await api.me();
       await ready.store.setMe(me);
       await ready.store.setSignedIn(true);
@@ -92,6 +97,14 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       ready.engine.start();
     },
     [ready],
+  );
+  const login = useCallback(
+    (username: string, passphrase: string) => signIn(() => api.login(username, passphrase)),
+    [signIn],
+  );
+  const setup = useCallback(
+    (username: string, passphrase: string) => signIn(() => api.setup(username, passphrase)),
+    [signIn],
   );
 
   const logout = useCallback(async () => {
@@ -109,8 +122,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [ready]);
 
   const value = useMemo(
-    () => (ready ? { ...ready, auth, login, logout } : null),
-    [ready, auth, login, logout],
+    () => (ready ? { ...ready, auth, login, setup, logout } : null),
+    [ready, auth, login, setup, logout],
   );
 
   if (!value || auth === "loading") return <>{fallback}</>;

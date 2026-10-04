@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   addDays,
+  changedOn,
   dayHeading,
   daysBetween,
   dueText,
@@ -94,4 +95,11 @@ test("isDate", () => {
 test("weekRange", () => {
   assert.equal(weekRange("2026-10-05"), "5 – 11 October");
   assert.equal(weekRange("2026-09-28"), "28 September – 4 October");
+});
+
+test("changedOn shows the local day, and the year only when it differs", () => {
+  const ms = Date.UTC(2026, 8, 12, 23, 30);
+  assert.equal(changedOn(ms, "UTC", "2026-10-04"), "12 September");
+  assert.equal(changedOn(ms, "Europe/Paris", "2026-10-04"), "13 September");
+  assert.equal(changedOn(ms, "UTC", "2027-01-02"), "12 September 2026");
 });

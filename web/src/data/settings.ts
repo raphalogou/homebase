@@ -1,4 +1,4 @@
-// Settings: zone and week start, the calendar link, and sessions.
+// Settings: zone and week start, the calendar link, the account, and sessions.
 
 import { useCallback } from "react";
 import { api } from "./api.ts";
@@ -13,6 +13,10 @@ export function useSessions() {
   return useOnline(api.sessions);
 }
 
+export function useAccount() {
+  return useOnline(api.account);
+}
+
 export function useSettingsActions() {
   const { store } = useData();
   return {
@@ -25,6 +29,22 @@ export function useSettingsActions() {
     ),
     rotateCalendar: useCallback(
       async () => (await needsServer(api.rotateCalendar(), "Making a new link")).url,
+      [],
+    ),
+    /**
+     * The account changes keep the server's ApiError, whose field tells the
+     * form which input the message belongs under.
+     */
+    changeUsername: useCallback(
+      async (username: string, passphrase: string) => {
+        const info = await api.changeUsername(username, passphrase);
+        if (store.me) await store.setMe({ ...store.me, username: info.username });
+        return info;
+      },
+      [store],
+    ),
+    changePassphrase: useCallback(
+      (current: string, next: string) => api.changePassphrase(current, next),
       [],
     ),
     revoke: useCallback(

@@ -36,7 +36,7 @@ export function PickDialog() {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => setOpen(o)}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/30" />
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-veil" />
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[85dvh] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[20px] bg-bg px-8 pt-8">
           <Dialog.Title className="mb-1 text-[26px]/[1.2] font-bold">{TITLE}</Dialog.Title>
           <div className="-mx-8 overflow-y-auto px-8">

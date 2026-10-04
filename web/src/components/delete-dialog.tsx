@@ -1,7 +1,5 @@
-import { Dialog } from "@base-ui/react/dialog";
-import { useIsDesktop } from "@/lib/use-media";
 import { Button } from "./ui/button";
-import { Sheet } from "./ui/sheet";
+import { ResponsiveDialog } from "./ui/dialog";
 
 interface DeleteDialogProps {
   open: boolean;
@@ -20,25 +18,10 @@ interface DeleteDialogProps {
 // Approved design: a bottom sheet on the phone, a small centred dialog on
 // desktop. Keeping the tasks is the first, primary choice.
 export function DeleteDialog(props: DeleteDialogProps) {
-  const desktop = useIsDesktop();
-  const body = <DeleteChoices {...props} />;
-  if (!desktop) {
-    return (
-      <Sheet open={props.open} onOpenChange={props.onOpenChange} title={props.title} showTitle>
-        {body}
-      </Sheet>
-    );
-  }
   return (
-    <Dialog.Root open={props.open} onOpenChange={(o) => props.onOpenChange(o)}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/30" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-bg p-8">
-          <Dialog.Title className="mb-4 text-[26px]/[1.2] font-bold">{props.title}</Dialog.Title>
-          {body}
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <ResponsiveDialog open={props.open} onOpenChange={props.onOpenChange} title={props.title}>
+      <DeleteChoices {...props} />
+    </ResponsiveDialog>
   );
 }
 

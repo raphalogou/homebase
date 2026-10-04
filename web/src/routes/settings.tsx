@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from "react";
+import { ChangePassphraseDialog, ChangeUsernameDialog } from "@/components/account-dialogs";
 import { Columns } from "@/components/app-shell";
 import { CheckIcon, NoticeIcon } from "@/components/icons";
 import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
@@ -6,10 +7,11 @@ import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
-import { ActionError, useAuth, useWeekStart } from "@/data/hooks";
+import { ActionError, useAuth, useToday, useWeekStart } from "@/data/hooks";
 import { useData } from "@/data/provider";
-import { useServerSettings, useSessions, useSettingsActions } from "@/data/settings";
-import type { SessionInfo } from "@/data/types";
+import { useAccount, useServerSettings, useSessions, useSettingsActions } from "@/data/settings";
+import type { AccountInfo, SessionInfo } from "@/data/types";
+import { changedOn } from "@/lib/dates";
 import { labelFromUA } from "@/lib/ua";
 
 function ago(ms: number): string {
@@ -26,6 +28,8 @@ function ago(ms: number): string {
 export default function Settings() {
   const notify = useNotify();
   const { logout } = useAuth();
+  // A new passphrase logs the other devices out, so the list loads again.
+  const [sessionsKey, setSessionsKey] = useState(0);
 
   async function run(fn: () => Promise<unknown>, done?: string) {
     try {
@@ -42,7 +46,8 @@ export default function Settings() {
       <ScreenTitle>Settings</ScreenTitle>
       <TimeAndWeek run={run} />
       <Calendar run={run} />
-      <Sessions run={run} />
+      <Account onSessionsChanged={() => setSessionsKey((k) => k + 1)} />
+      <Sessions key={sessionsKey} run={run} />
       <div className="mt-10 border-t border-line pt-6">
         <Button variant="secondary" onClick={() => void logout()}>
           Log out of this device
@@ -162,6 +167,71 @@ function Calendar({ run }: { run: Run }) {
           </>
         )}
       </div>
+    </section>
+  );
+}
+
+function Account({ onSessionsChanged }: { onSessionsChanged: () => void }) {
+  const { store } = useData();
+  const notify = useNotify();
+  const today = useToday();
+  const [account] = useAccount();
+  const [saved, setSaved] = useState<AccountInfo | null>(null);
+  const [editing, setEditing] = useState<"username" | "passphrase" | null>(null);
+  const id = useId();
+  const info = saved ?? (account.state === "ready" ? account.data : null);
+  const username = info?.username ?? store.me?.username ?? "";
+
+  const row = (label: string, value: string, what: "username" | "passphrase") => (
+    <li className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-muted-foreground">{label}</p>
+        <p className="truncate text-[17px]">{value}</p>
+      </div>
+      <Button
+        variant="text"
+        aria-label={`Change ${what}`}
+        onClick={() => setEditing(what)}
+        disabled={account.state === "offline"}
+      >
+        Change
+      </Button>
+    </li>
+  );
+
+  return (
+    <section aria-labelledby={`${id}-h`} className="mt-10">
+      <SectionLabel id={`${id}-h`}>Account</SectionLabel>
+      <ul>
+        {row("Username", username || "Not loaded", "username")}
+        {row(
+          "Passphrase",
+          info
+            ? `Changed ${changedOn(info.passphraseChangedAt, store.me?.tz ?? "UTC", today)}`
+            : "Set",
+          "passphrase",
+        )}
+      </ul>
+      {account.state === "offline" && (
+        <p className="mt-1 text-[13px] text-muted-foreground">Changing these needs a connection.</p>
+      )}
+      <ChangeUsernameDialog
+        open={editing === "username"}
+        onOpenChange={(o) => setEditing(o ? "username" : null)}
+        onSaved={(i) => {
+          setSaved(i);
+          notify({ title: "Username saved", icon: CheckIcon });
+        }}
+      />
+      <ChangePassphraseDialog
+        open={editing === "passphrase"}
+        onOpenChange={(o) => setEditing(o ? "passphrase" : null)}
+        onSaved={(i) => {
+          setSaved(i);
+          onSessionsChanged();
+          notify({ title: "Passphrase saved. Other devices were logged out.", icon: CheckIcon });
+        }}
+      />
     </section>
   );
 }
