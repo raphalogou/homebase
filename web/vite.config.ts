@@ -38,7 +38,12 @@ export default defineConfig({
       },
       injectManifest: {
         // The plugin adds the manifest and its icons itself.
-        globPatterns: ["**/*.{js,css,html,woff2}", "apple-touch-icon.png", "badge-96.png"],
+        globPatterns: [
+          "**/*.{js,css,html,woff2}",
+          "apple-touch-icon.png",
+          "badge-96.png",
+          "icon.svg",
+        ],
       },
     }),
   ],

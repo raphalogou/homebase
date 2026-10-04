@@ -11,6 +11,7 @@ import {
   startOfWeek,
   todayIn,
   weekday,
+  weekdayShort,
   weekOf,
   weekRange,
 } from "./dates.ts";
@@ -102,4 +103,8 @@ test("changedOn shows the local day, and the year only when it differs", () => {
   assert.equal(changedOn(ms, "UTC", "2026-10-04"), "12 September");
   assert.equal(changedOn(ms, "Europe/Paris", "2026-10-04"), "13 September");
   assert.equal(changedOn(ms, "UTC", "2027-01-02"), "12 September 2026");
+});
+
+test("weekdayShort", () => {
+  assert.equal(weekdayShort("2026-03-04"), "Wed");
 });

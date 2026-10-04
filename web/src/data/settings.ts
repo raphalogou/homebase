@@ -1,4 +1,4 @@
-// Settings: zone and week start, the calendar link, the account, and sessions.
+// Settings: zone and week start, the calendar link, backups, the account, and sessions.
 
 import { useCallback } from "react";
 import { api } from "./api.ts";
@@ -24,6 +24,16 @@ export function useSettingsActions() {
       async (tz: string, weekStart: 0 | 1) => {
         const s = await needsServer(api.putSettings(tz, weekStart), "Changing settings");
         if (store.me) await store.setMe({ ...store.me, tz: s.tz, weekStart: s.weekStart });
+      },
+      [store],
+    ),
+    saveBackups: useCallback(
+      async (on: boolean) => {
+        const me = store.me;
+        await needsServer(
+          api.putSettings(me?.tz ?? "UTC", me?.weekStart ?? 1, on),
+          "Changing backups",
+        );
       },
       [store],
     ),

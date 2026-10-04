@@ -32,7 +32,7 @@ import { useReviewDue } from "@/data/review";
 import { useFirstLoad } from "@/data/sync-status";
 import type { Task } from "@/data/types";
 import { longDate } from "@/lib/dates";
-import { useOpenPick } from "@/lib/open-pick";
+import { useOpenModal, useOpenPick } from "@/lib/modal";
 import { useIsDesktop } from "@/lib/use-media";
 
 const SLOT_TEXT = ["Choose your first", "Choose a second", "Choose a third"];
@@ -96,6 +96,7 @@ function TodayBody() {
   const actions = useActions();
   const desktop = useIsDesktop();
   const [, setPick] = useOpenPick();
+  const openModal = useOpenModal();
   const room = planned.length < MAX_PER_DAY;
 
   return (
@@ -160,17 +161,18 @@ function TodayBody() {
         {/* The phone's tab bar has four places; these are reached from here. */}
         {!desktop &&
           [
-            { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
-            { to: "/settings", label: "Settings", Icon: SettingsIcon },
-          ].map(({ to, label, Icon }) => (
-            <Link
-              key={to}
-              to={to}
+            { name: "reminders", label: "Reminders", Icon: RemindersIcon },
+            { name: "settings", label: "Settings", Icon: SettingsIcon },
+          ].map(({ name, label, Icon }) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => openModal(name)}
               className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
             >
               <Icon size={20} />
               {label}
-            </Link>
+            </button>
           ))}
         <InstallButton />
       </div>

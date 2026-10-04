@@ -24,7 +24,7 @@ function ActionButton({ action }: { action: Action }) {
           "inline-flex items-center justify-center font-semibold",
           action.text
             ? "mt-2 min-h-11 underline underline-offset-[3px]"
-            : cn("rounded-lg border border-ink bg-field", cls),
+            : cn("rounded-sm border border-ink bg-field", cls),
         )}
       >
         {action.label}

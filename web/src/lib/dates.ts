@@ -66,6 +66,11 @@ export function longDate(date: LocalDate): string {
 }
 
 /** "W" */
+/** "Mon" */
+export function weekdayShort(date: LocalDate): string {
+  return fmt(date, { weekday: "short" });
+}
+
 export function weekdayLetter(date: LocalDate): string {
   return fmt(date, { weekday: "narrow" });
 }

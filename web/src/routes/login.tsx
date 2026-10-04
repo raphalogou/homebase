@@ -43,9 +43,9 @@ export default function Login() {
   }
 
   return (
-    <AuthPage title="Log in" intro="Enter your username and passphrase.">
+    <AuthPage title="Log in" statement={"Three things,\nchosen on purpose."}>
       {sessionEnded && (
-        <div className="mt-6 flex gap-3 rounded-lg bg-soft px-4 py-3" role="status">
+        <div className="mt-5 flex gap-3 rounded-lg bg-soft px-4 py-3" role="status">
           <NoticeIcon size={18} className="mt-[3px] shrink-0" />
           <p>
             <strong className="block font-semibold">Your session ended</strong>
@@ -55,7 +55,7 @@ export default function Login() {
           </p>
         </div>
       )}
-      <form onSubmit={submit} className="mt-6 flex flex-col gap-5" noValidate>
+      <form onSubmit={submit} className="mt-5 flex flex-col gap-5" noValidate>
         <TextField
           label="Username"
           autoComplete="username"

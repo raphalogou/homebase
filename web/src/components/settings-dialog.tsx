@@ -1,20 +1,23 @@
+import { Tabs } from "@base-ui/react/tabs";
 import { useId, useMemo, useState } from "react";
-import { ChangePassphraseDialog, ChangeUsernameDialog } from "@/components/account-dialogs";
-import { Columns } from "@/components/app-shell";
+import { ACCOUNT_VIEWS } from "@/components/account-forms";
 import { CheckIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
-import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
+import { Empty } from "@/components/section";
 import { useShowShortcuts } from "@/components/shortcuts";
 import { InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
+import { ResponsiveDialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { ActionError, useAuth, useToday, useWeekStart } from "@/data/hooks";
 import { useData } from "@/data/provider";
 import { useAccount, useServerSettings, useSessions, useSettingsActions } from "@/data/settings";
-import type { AccountInfo, SessionInfo } from "@/data/types";
+import type { SessionInfo } from "@/data/types";
 import { changedOn } from "@/lib/dates";
-import { getTheme, setTheme, type Theme } from "@/lib/theme";
+import { useModal } from "@/lib/modal";
+import { setTheme, type Theme, useTheme } from "@/lib/theme";
 import { labelFromUA } from "@/lib/ua";
 import { useIsDesktop } from "@/lib/use-media";
 
@@ -27,15 +30,39 @@ function ago(ms: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-// Approved design: one plain page with Time and week, Calendar, Sessions,
-// then logging out of this device.
-export default function Settings() {
-  const notify = useNotify();
-  const { logout } = useAuth();
+const TABS = [
+  { value: "time", label: "Time and week" },
+  { value: "calendar", label: "Calendar" },
+  { value: "backups", label: "Backups" },
+  { value: "account", label: "Account" },
+  { value: "sessions", label: "Sessions" },
+] as const;
+
+type Tab = (typeof TABS)[number]["value"];
+type Change = keyof typeof ACCOUNT_VIEWS;
+
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v);
+const isChange = (v: string | null): v is Change => v === "username" || v === "passphrase";
+
+const tabClass =
+  "flex min-h-11 shrink-0 items-center rounded-md px-3 text-left text-[15px] font-medium whitespace-nowrap hover:bg-soft data-active:bg-soft data-active:font-semibold focus-visible:outline-offset-[-2px]";
+
+// Approved design: a modal over the current screen with a tab for each part:
+// Time and week, Calendar, Backups, Account, Sessions (?settings=calendar; "1" is the
+// first). The tabs are a column on desktop and a scrolling row on the phone.
+// Changing the username or passphrase swaps the content for that form
+// (?settings=username), with a back button to the Account tab.
+export function SettingsDialog() {
+  const [param, setView] = useModal("settings");
   const desktop = useIsDesktop();
   const showShortcuts = useShowShortcuts();
-  // A new passphrase logs the other devices out, so the list loads again.
-  const [sessionsKey, setSessionsKey] = useState(0);
+  const { logout } = useAuth();
+  const notify = useNotify();
+  const change = isChange(param) ? param : null;
+  const tab: Tab | null = param === "1" ? "time" : isTab(param) ? param : null;
+  const account = change ? ACCOUNT_VIEWS[change] : null;
+  const back = () => setView("account", true);
+  const close = () => setView(null);
 
   async function run(fn: () => Promise<unknown>, done?: string) {
     try {
@@ -47,27 +74,85 @@ export default function Settings() {
     }
   }
 
-  const main = (
-    <>
-      <ScreenTitle>Settings</ScreenTitle>
-      <TimeAndWeek />
-      <Calendar run={run} />
-      <Account onSessionsChanged={() => setSessionsKey((k) => k + 1)} />
-      <Sessions key={sessionsKey} run={run} />
-      <div className="mt-10 border-t border-line pt-6">
-        <Button variant="secondary" onClick={() => void logout()}>
-          <LogOutIcon size={20} />
-          Log out of this device
-        </Button>
-      </div>
-      {desktop && (
-        <Button variant="text" className="mt-6" onClick={showShortcuts}>
-          Keyboard shortcuts
-        </Button>
+  return (
+    <ResponsiveDialog
+      open={tab !== null || change !== null}
+      onOpenChange={(o) => !o && close()}
+      title={account?.title ?? "Settings"}
+      description={account?.description}
+      width={account ? 560 : 760}
+      back={account ? { label: "Back to Settings", onClick: back } : undefined}
+    >
+      {account ? (
+        <account.Form
+          onClose={back}
+          onSaved={() =>
+            notify({
+              title:
+                change === "passphrase"
+                  ? "Passphrase saved. Other devices were logged out."
+                  : "Username saved",
+              icon: CheckIcon,
+            })
+          }
+        />
+      ) : (
+        tab && (
+          <Tabs.Root
+            value={tab}
+            onValueChange={(v: Tab) => setView(v, true)}
+            orientation={desktop ? "vertical" : "horizontal"}
+            className="flex flex-col gap-6 min-[900px]:min-h-[440px] min-[900px]:flex-row min-[900px]:gap-8"
+          >
+            <div className="flex shrink-0 flex-col min-[900px]:w-44">
+              <Tabs.List className="-mx-6 flex gap-1 overflow-x-auto px-6 [scrollbar-width:none] min-[900px]:mx-0 min-[900px]:flex-col min-[900px]:px-0">
+                {TABS.map((t) => (
+                  <Tabs.Tab key={t.value} value={t.value} className={tabClass}>
+                    {t.label}
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+              {desktop && (
+                <Button
+                  variant="text"
+                  className="mt-auto self-start"
+                  onClick={() => {
+                    close();
+                    showShortcuts();
+                  }}
+                >
+                  Keyboard shortcuts
+                </Button>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <Tabs.Panel value="time">
+                <TimeAndWeek />
+              </Tabs.Panel>
+              <Tabs.Panel value="calendar">
+                <Calendar run={run} />
+              </Tabs.Panel>
+              <Tabs.Panel value="backups">
+                <Backups run={run} />
+              </Tabs.Panel>
+              <Tabs.Panel value="account">
+                <Account onChange={(v) => setView(v)} />
+              </Tabs.Panel>
+              <Tabs.Panel value="sessions">
+                <Sessions run={run} />
+                <div className="mt-8 border-t border-line pt-6">
+                  <Button variant="secondary" onClick={() => void logout()}>
+                    <LogOutIcon size={20} />
+                    Log out of this device
+                  </Button>
+                </div>
+              </Tabs.Panel>
+            </div>
+          </Tabs.Root>
+        )
       )}
-    </>
+    </ResponsiveDialog>
   );
-  return <Columns main={main} />;
 }
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
@@ -77,7 +162,7 @@ function TimeAndWeek() {
   const weekStart = useWeekStart();
   const actions = useSettingsActions();
   const id = useId();
-  const [theme, setThemeState] = useState<Theme>(getTheme);
+  const theme = useTheme();
   const notify = useNotify();
   // A failed save shows under the control it belongs to.
   const [failed, setFailed] = useState<"tz" | "week" | null>(null);
@@ -98,9 +183,8 @@ function TimeAndWeek() {
   }, [tz]);
 
   return (
-    <section aria-labelledby={`${id}-h`} className="mt-8">
-      <SectionLabel id={`${id}-h`}>Time and week</SectionLabel>
-      <div className="flex flex-col gap-4 border-t border-line pt-4">
+    <div>
+      <div className="flex flex-col gap-4">
         <div>
           <Label htmlFor={`${id}-tz`}>Time zone</Label>
           <Select
@@ -146,15 +230,12 @@ function TimeAndWeek() {
               { value: "light", label: "Light" },
               { value: "dark", label: "Dark" },
             ]}
-            onChange={(v) => {
-              setTheme(v);
-              setThemeState(v);
-            }}
+            onChange={setTheme}
           />
           <p className="mt-1.5 text-[13px] text-muted-foreground">On this device only.</p>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -166,9 +247,8 @@ function Calendar({ run }: { run: Run }) {
   const shown = url ?? (settings.state === "ready" ? settings.data.calendarUrl : null);
 
   return (
-    <section aria-labelledby={`${id}-h`} className="mt-10">
-      <SectionLabel id={`${id}-h`}>Calendar</SectionLabel>
-      <div className="border-t border-line pt-4">
+    <div>
+      <div>
         <p className="text-muted-foreground">
           Add this private link to Google Calendar ("From URL") to see due and planned tasks there.
           Google refreshes it every few hours, so changes show up slowly.
@@ -216,23 +296,85 @@ function Calendar({ run }: { run: Run }) {
           </>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 
-function Account({ onSessionsChanged }: { onSessionsChanged: () => void }) {
+/** "day", "week", "3 days", "6 hours": the end of "Back up every …". */
+function every(hours: number): string {
+  if (hours === 24) return "day";
+  if (hours === 168) return "week";
+  if (hours % 24 === 0) return `${hours / 24} days`;
+  return hours === 1 ? "hour" : `${hours} hours`;
+}
+
+function Backups({ run }: { run: Run }) {
+  const [settings] = useServerSettings();
   const { store } = useData();
-  const notify = useNotify();
+  const today = useToday();
+  const actions = useSettingsActions();
+  const [on, setOn] = useState<boolean | null>(null);
+  if (settings.state === "loading") {
+    return <SkeletonRows kind="line" count={2} label="Loading backups" />;
+  }
+  if (settings.state !== "ready") return <Empty>Backups need a connection.</Empty>;
+  const { backupDir, backupHours, lastBackupAt } = settings.data;
+  const label = `Back up every ${every(backupHours)}`;
+  const enabled = on ?? settings.data.backups;
+  const tz = store.me?.tz ?? "UTC";
+
+  return (
+    <div>
+      <div className="flex min-h-16 items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[17px] font-medium">{label}</p>
+          <p className="text-[13px] text-muted-foreground">
+            The server copies your tasks, files and reminder key.
+          </p>
+        </div>
+        <ToggleSwitch
+          label={label}
+          checked={enabled}
+          onChange={(v) =>
+            void run(
+              async () => {
+                await actions.saveBackups(v);
+                setOn(v);
+              },
+              v ? "Backups on" : "Backups off",
+            )
+          }
+        />
+      </div>
+      <dl className="mt-4 border-t border-line pt-4 text-[15px]">
+        <dt className="text-[13px] text-muted-foreground">Folder on the server</dt>
+        <dd className="mt-0.5 break-all font-mono text-sm">{backupDir}</dd>
+        <dt className="mt-4 text-[13px] text-muted-foreground">Last backup</dt>
+        <dd className="mt-0.5">
+          {lastBackupAt
+            ? `${changedOn(lastBackupAt, tz, today)}, ${new Date(lastBackupAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: tz })}`
+            : enabled
+              ? "None yet. The first is made within a minute."
+              : "None yet"}
+        </dd>
+      </dl>
+      <p className="mt-4 text-[13px] text-muted-foreground">
+        A copy on the same disk does not survive losing that disk. Set HOMEBASE_BACKUP_DIR to
+        another one, or copy this folder elsewhere now and then.
+      </p>
+    </div>
+  );
+}
+
+function Account({ onChange }: { onChange: (view: keyof typeof ACCOUNT_VIEWS) => void }) {
+  const { store } = useData();
   const today = useToday();
   const [account] = useAccount();
-  const [saved, setSaved] = useState<AccountInfo | null>(null);
-  const [editing, setEditing] = useState<"username" | "passphrase" | null>(null);
-  const id = useId();
-  const info = saved ?? (account.state === "ready" ? account.data : null);
+  const info = account.state === "ready" ? account.data : null;
   const username = info?.username ?? store.me?.username ?? "";
 
-  const row = (label: string, value: string, what: "username" | "passphrase") => (
-    <li className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
+  const row = (label: string, value: string, what: keyof typeof ACCOUNT_VIEWS) => (
+    <li className="flex min-h-16 items-center gap-3 border-t border-line py-2.5 first:border-t-0">
       <div className="min-w-0 flex-1">
         <p className="text-[13px] text-muted-foreground">{label}</p>
         <p className="truncate text-[17px]">{value}</p>
@@ -240,7 +382,7 @@ function Account({ onSessionsChanged }: { onSessionsChanged: () => void }) {
       <Button
         variant="text"
         aria-label={`Change ${what}`}
-        onClick={() => setEditing(what)}
+        onClick={() => onChange(what)}
         disabled={account.state === "offline"}
       >
         Change
@@ -249,8 +391,7 @@ function Account({ onSessionsChanged }: { onSessionsChanged: () => void }) {
   );
 
   return (
-    <section aria-labelledby={`${id}-h`} className="mt-10">
-      <SectionLabel id={`${id}-h`}>Account</SectionLabel>
+    <div>
       <ul>
         {row("Username", username || "Not loaded", "username")}
         {row(
@@ -264,34 +405,15 @@ function Account({ onSessionsChanged }: { onSessionsChanged: () => void }) {
       {account.state === "offline" && (
         <p className="mt-1 text-[13px] text-muted-foreground">Changing these needs a connection.</p>
       )}
-      <ChangeUsernameDialog
-        open={editing === "username"}
-        onOpenChange={(o) => setEditing(o ? "username" : null)}
-        onSaved={(i) => {
-          setSaved(i);
-          notify({ title: "Username saved", icon: CheckIcon });
-        }}
-      />
-      <ChangePassphraseDialog
-        open={editing === "passphrase"}
-        onOpenChange={(o) => setEditing(o ? "passphrase" : null)}
-        onSaved={(i) => {
-          setSaved(i);
-          onSessionsChanged();
-          notify({ title: "Passphrase saved. Other devices were logged out.", icon: CheckIcon });
-        }}
-      />
-    </section>
+    </div>
   );
 }
 
 function Sessions({ run }: { run: Run }) {
   const [sessions, reload] = useSessions();
   const actions = useSettingsActions();
-  const id = useId();
   return (
-    <section aria-labelledby={`${id}-h`} className="mt-10">
-      <SectionLabel id={`${id}-h`}>Sessions</SectionLabel>
+    <div>
       {sessions.state === "loading" && (
         <SkeletonRows kind="line" count={2} label="Loading your sessions" />
       )}
@@ -299,7 +421,10 @@ function Sessions({ run }: { run: Run }) {
       {sessions.state === "ready" && (
         <ul>
           {sessions.data.map((s: SessionInfo) => (
-            <li key={s.id} className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
+            <li
+              key={s.id}
+              className="flex min-h-16 items-center gap-3 border-t border-line py-2.5 first:border-t-0"
+            >
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{labelFromUA(s.label) || "Unknown browser"}</p>
                 <p className="text-[13px] text-muted-foreground">
@@ -324,6 +449,6 @@ function Sessions({ run }: { run: Run }) {
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

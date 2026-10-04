@@ -9,7 +9,7 @@ import {
   useToday,
 } from "@/data/hooks";
 import type { Task } from "@/data/types";
-import { useOpenPick } from "@/lib/open-pick";
+import { useOpenPick } from "@/lib/modal";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 import { CheckIcon, NoticeIcon, PlannedIcon } from "./icons";

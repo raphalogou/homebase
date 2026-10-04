@@ -34,6 +34,13 @@
   --soft-day: #e0e3dc;
   --highlight: #f2e94e;
   --highlight-text: #15191a;
+  --danger: #9a3b12;
+  /* The auth screens' desktop panel stays dark in both themes. */
+  --panel: #15191a;
+  --panel-text: #f2f3ef;
+  --panel-muted: #c4c9c3;
+  /* The panel's wordmark keeps the light theme's yellow, since the panel never changes. */
+  --panel-mark: #f2e94e;
   --notif-bg: #1b1c1f;
   --notif-card: #2e3034;
   --veil: rgb(21 25 26 / 0.3);
@@ -56,6 +63,8 @@
     --soft-day: #2a312e;
     --highlight: #6e6616;
     --highlight-text: #ecefea;
+    --danger: #f0a07a;
+    --panel: #1f2523;
     --veil: rgb(0 0 0 / 0.6);
     --lift: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--line);
     --lift-small: 0 1px 2px rgb(0 0 0 / 0.5);
@@ -74,6 +83,8 @@
   --soft-day: #2a312e;
   --highlight: #6e6616;
   --highlight-text: #ecefea;
+  --danger: #f0a07a;
+  --panel: #1f2523;
   --veil: rgb(0 0 0 / 0.6);
   --lift: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--line);
   --lift-small: 0 1px 2px rgb(0 0 0 / 0.5);
@@ -84,7 +95,8 @@
  * primary, muted-foreground, ...), so those map onto the Homebase tokens and
  * restyle every primitive without editing it. Note that shadcn's "muted" is a
  * fill, so DESIGN.md's --muted text colour is `text-muted-foreground`.
- * There is no red: destructive actions look like any other ink action.
+ * Destructive actions look like any other ink action; --danger is only for
+ * a field's error on the auth and account forms.
  */
 @theme inline {
   --color-bg: var(--bg);
@@ -95,6 +107,11 @@
   --color-soft-day: var(--soft-day);
   --color-border-strong: var(--border);
   --color-highlight: var(--highlight);
+  --color-danger: var(--danger);
+  --color-panel: var(--panel);
+  --color-panel-text: var(--panel-text);
+  --color-panel-muted: var(--panel-muted);
+  --color-panel-mark: var(--panel-mark);
   --color-notif-bg: var(--notif-bg);
   --color-notif-card: var(--notif-card);
   --color-veil: var(--veil);

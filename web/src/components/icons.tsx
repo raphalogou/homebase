@@ -27,6 +27,8 @@ import {
   LogOut,
   type LucideIcon,
   type LucideProps,
+  Monitor,
+  Moon,
   NotebookPen,
   Paperclip,
   Plus,
@@ -35,7 +37,9 @@ import {
   Settings,
   StickyNote,
   Sun,
+  SunMedium,
   Trash2,
+  TriangleAlert,
   Undo2,
   X,
 } from "lucide-react";
@@ -81,9 +85,13 @@ export const ReviewIcon = icon(ClipboardCheck);
 export const SettingsIcon = icon(Settings);
 export const ShowIcon = icon(Eye);
 export const HideIcon = icon(EyeOff);
+export const WarningIcon = icon(TriangleAlert);
 export const OfflineIcon = icon(CloudOff);
 export const SyncedIcon = icon(CircleCheck);
 export const SyncingIcon = icon(RefreshCw);
 export const KeyboardIcon = icon(Keyboard);
 export const LogOutIcon = icon(LogOut);
 export const AddIcon = icon(Plus);
+export const DarkIcon = icon(Moon);
+export const LightIcon = icon(SunMedium);
+export const SystemIcon = icon(Monitor);

@@ -1,14 +1,15 @@
 import { useEffect, useId, useState } from "react";
-import { Columns } from "@/components/app-shell";
 import { CheckIcon, NoticeIcon, RemindersIcon } from "@/components/icons";
-import { Empty, ScreenTitle, SectionLabel } from "@/components/section";
+import { Empty, SectionLabel } from "@/components/section";
 import { FirstLoad, InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
+import { ResponsiveDialog } from "@/components/ui/dialog";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { ActionError } from "@/data/hooks";
 import { useAdoptBrowserZone, usePush, useReminders, useSaveReminder } from "@/data/reminders";
 import type { Device, Reminder } from "@/data/types";
+import { useModal } from "@/lib/modal";
 
 const KINDS: Record<Reminder["kind"], { name: string; text: string }> = {
   focus: { name: "Morning focus", text: "One of your goals, and the three you chose for today." },
@@ -19,7 +20,22 @@ const KINDS: Record<Reminder["kind"], { name: string; text: string }> = {
   },
 };
 
-export default function Reminders() {
+// A modal over the current screen (?reminders=1), like Settings.
+export function RemindersDialog() {
+  const [view, setView] = useModal("reminders");
+  return (
+    <ResponsiveDialog
+      open={view !== null}
+      onOpenChange={(o) => !o && setView(null)}
+      title="Reminders"
+      width={560}
+    >
+      {view !== null && <RemindersBody />}
+    </ResponsiveDialog>
+  );
+}
+
+function RemindersBody() {
   const reminders = useReminders();
   const zone = useAdoptBrowserZone();
   const notify = useNotify();
@@ -34,10 +50,9 @@ export default function Reminders() {
     }
   }
 
-  const main = (
+  return (
     <>
-      <ScreenTitle>Reminders</ScreenTitle>
-      <p className="mt-2 text-muted-foreground">
+      <p className="text-muted-foreground">
         Up to three a day, written from what you planned.
         {zone ? ` Times are in ${zone.replace(/_/g, " ")}.` : ""}
       </p>
@@ -58,7 +73,6 @@ export default function Reminders() {
       <ThisDevice run={run} />
     </>
   );
-  return <Columns main={main} />;
 }
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;

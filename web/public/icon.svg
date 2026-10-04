@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>Homebase</title>
+  <rect width="100" height="100" rx="22" fill="#f2f3ef"/>
+  <path d="M21 46 50 23l29 23" fill="none" stroke="#15191a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M27 62.5 73 60.5" stroke="#f2e94e" stroke-width="10"/>
+  <path d="M31 58h38M31 71h28M31 83h18" stroke="#15191a" stroke-width="7" stroke-linecap="round"/>
+</svg>

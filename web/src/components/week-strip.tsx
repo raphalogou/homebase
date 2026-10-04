@@ -7,6 +7,7 @@ import {
   longDate,
   startOfWeek,
   weekdayLetter,
+  weekdayShort,
   weekOf,
   weekRange,
 } from "@/lib/dates";
@@ -17,12 +18,14 @@ interface WeekStripProps {
   selected: LocalDate | null;
   /** Called with the tapped day, or null when the selected day is tapped again. */
   onSelect: (day: LocalDate | null) => void;
+  /** "Mon" instead of "M", where the strip has the room (Plan). */
+  shortDays?: boolean;
 }
 
 // Seven equal cells: weekday letter, date, up to three dots for how much is
 // planned or due. Approved: arrows move a week at a time, and the range label
 // returns to this week. Weeks start on settings.weekStart.
-export function WeekStrip({ selected, onSelect }: WeekStripProps) {
+export function WeekStrip({ selected, onSelect, shortDays = false }: WeekStripProps) {
   const today = useToday();
   const weekStart = useWeekStart();
   const tasks = useTasks();
@@ -94,14 +97,14 @@ export function WeekStrip({ selected, onSelect }: WeekStripProps) {
                 type="button"
                 className={cn(
                   "flex min-h-[68px] w-full flex-col items-center justify-center gap-1 rounded-md",
-                  d === selected && "bg-soft-day",
+                  d === selected ? "bg-soft-day" : "hover:bg-soft",
                 )}
                 aria-pressed={d === selected}
                 aria-label={label}
                 onClick={() => onSelect(d === selected ? null : d)}
               >
                 <span className="text-xs font-medium text-muted-foreground">
-                  {weekdayLetter(d)}
+                  {shortDays ? weekdayShort(d) : weekdayLetter(d)}
                 </span>
                 <span
                   className={cn(

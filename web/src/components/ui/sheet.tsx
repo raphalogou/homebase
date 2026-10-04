@@ -1,5 +1,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import type { ReactNode } from "react";
+import { BackIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 interface SheetProps {
@@ -12,6 +13,27 @@ interface SheetProps {
   description?: string | undefined;
   children: ReactNode;
   className?: string;
+  /** A back button before a shown title, for a view inside a modal. */
+  back?: BackAction | undefined;
+}
+
+export interface BackAction {
+  label: string;
+  onClick: () => void;
+}
+
+/** The icon button before a modal's title that returns to its previous view. */
+export function BackButton({ back }: { back: BackAction }) {
+  return (
+    <button
+      type="button"
+      aria-label={back.label}
+      onClick={back.onClick}
+      className="-ml-2.5 grid size-11 shrink-0 place-items-center rounded-md hover:bg-soft"
+    >
+      <BackIcon size={24} />
+    </button>
+  );
 }
 
 // The phone's bottom sheet (DESIGN.md "Layout"): grab bar, 20 px top radius,
@@ -24,6 +46,7 @@ export function Sheet({
   description,
   children,
   className,
+  back,
 }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
@@ -39,15 +62,16 @@ export function Sheet({
             aria-hidden="true"
             className="mx-auto mt-2.5 mb-3 h-1 w-10 shrink-0 rounded-full bg-border-strong"
           />
-          <Dialog.Title
-            className={
-              showTitle
-                ? cn("text-[30px]/[1.15] font-bold", description ? "mb-1" : "mb-4")
-                : "sr-only"
-            }
+          <div
+            className={cn("flex items-center gap-1", showTitle && (description ? "mb-1" : "mb-4"))}
           >
-            {title}
-          </Dialog.Title>
+            {back && <BackButton back={back} />}
+            <Dialog.Title
+              className={showTitle ? "min-w-0 text-[30px]/[1.15] font-bold" : "sr-only"}
+            >
+              {title}
+            </Dialog.Title>
+          </div>
           {description && (
             <Dialog.Description className="mb-5 text-muted-foreground">
               {description}

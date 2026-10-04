@@ -65,14 +65,11 @@ export default function Setup() {
   });
 
   return (
-    <AuthPage
-      title="Set up Homebase"
-      intro="Choose how you will log in. There is one account, just for you."
-    >
-      <form onSubmit={submit} className="mt-6 flex flex-col gap-5" noValidate>
+    <AuthPage title="Set up Homebase" statement={"One account, just\nfor you."}>
+      <form onSubmit={submit} className="mt-5 flex flex-col gap-5" noValidate>
         <TextField
           label="Username"
-          hint={USERNAME_HINT}
+          placeholder={USERNAME_HINT}
           autoComplete="username"
           autoCapitalize="none"
           autoCorrect="off"
@@ -94,14 +91,9 @@ export default function Setup() {
           value={confirm}
           {...field("confirm", setConfirm)}
         />
-        <div className="mt-1">
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Creating account" : "Create account"}
-          </Button>
-          <p className="mt-2 text-[13px] text-muted-foreground">
-            You can change both later in Settings.
-          </p>
-        </div>
+        <Button type="submit" className="mt-1 w-full" disabled={busy}>
+          {busy ? "Creating account" : "Create account"}
+        </Button>
       </form>
     </AuthPage>
   );

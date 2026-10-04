@@ -166,8 +166,12 @@ export const api = {
   rotateCalendar: () => request<{ url: string }>("POST", "/api/calendar/rotate"),
   sessions: () => request<SessionInfo[]>("GET", "/api/sessions"),
   revokeSession: (id: string) => request<void>("POST", "/api/sessions/revoke", { id }),
-  putSettings: (tz: string, weekStart: 0 | 1) =>
-    request<{ tz: string; weekStart: 0 | 1 }>("PUT", "/api/settings", { tz, weekStart }),
+  putSettings: (tz: string, weekStart: 0 | 1, backups?: boolean) =>
+    request<{ tz: string; weekStart: 0 | 1; backups: boolean }>("PUT", "/api/settings", {
+      tz,
+      weekStart,
+      ...(backups === undefined ? {} : { backups }),
+    }),
   promote: (taskId: string, goalId: string | null) =>
     request<{ project: Project; removedTaskId: string }>(
       "POST",

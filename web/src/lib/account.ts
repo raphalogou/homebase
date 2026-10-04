@@ -5,7 +5,7 @@ export const MIN_PASSPHRASE = 12;
 export const MAX_PASSPHRASE = 1000;
 
 export const PASSPHRASE_HINT = "At least 12 characters. Several random words work well.";
-export const USERNAME_HINT = "Letters, numbers, dots and dashes.";
+export const USERNAME_HINT = "Letters, numbers, dots and dashes";
 export const USERNAME_ERROR = "Use 3 to 32 letters, numbers, dots or dashes.";
 export const MISMATCH = "The two passphrases do not match.";
 

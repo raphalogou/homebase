@@ -1,17 +1,17 @@
 import { type ComponentProps, useId, useLayoutEffect, useRef, useState } from "react";
 import { Input, Label } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { HideIcon, ShowIcon } from "./icons";
+import { HideIcon, ShowIcon, WarningIcon } from "./icons";
 
 interface FieldProps extends Omit<ComponentProps<"input">, "id" | "type"> {
   label: string;
   /** A quiet line under the field, such as the passphrase rule. */
   hint?: string | undefined;
-  /** Shown under the field in ink, with a 2 px ink border on the field. */
+  /** Shown under the field in --danger, with a 2 px --danger border on the field. */
   error?: string | undefined;
 }
 
-// Errors are plain ink text under their field, never red (Phase 6 design).
+// The owner asked for errors in --danger: the border, the outline, the text and its icon.
 function Messages({
   id,
   hint,
@@ -29,13 +29,21 @@ function Messages({
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} className="mt-1.5 text-[15px] text-ink" role="alert">
+        <p
+          id={`${id}-error`}
+          className="mt-1.5 flex items-start gap-2 text-[15px] text-danger"
+          role="alert"
+        >
+          <WarningIcon size={18} className="mt-[3px] shrink-0" />
           {error}
         </p>
       )}
     </>
   );
 }
+
+const errorClass =
+  "border-2 border-danger focus-visible:border-danger focus-visible:ring-danger/20";
 
 function describedBy(id: string, hint?: string, error?: string): string | undefined {
   const ids = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean);
@@ -52,7 +60,7 @@ export function TextField({ label, hint, error, className, ...props }: FieldProp
         type="text"
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, hint, error)}
-        className={cn(error && "border-2 border-ink")}
+        className={cn(error && errorClass)}
         {...props}
       />
       <Messages id={id} hint={hint} error={error} />
@@ -92,7 +100,7 @@ export function PassphraseField({ label, hint, error, className, ...props }: Fie
           spellCheck={false}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy(id, hint, error)}
-          className={cn("pr-14", error && "border-2 border-ink")}
+          className={cn("pr-14", error && errorClass)}
           {...props}
         />
         <button

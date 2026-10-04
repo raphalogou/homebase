@@ -12,11 +12,11 @@ import {
 import { useFieldErrors } from "@/lib/use-field-errors";
 import { PassphraseField, TextField } from "./form-field";
 import { Button } from "./ui/button";
-import { DialogActions, ResponsiveDialog } from "./ui/dialog";
+import { DialogActions } from "./ui/dialog";
 
 interface ChangeProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** Back to the Settings view, after Cancel or a save. */
+  onClose: () => void;
   onSaved: (info: AccountInfo) => void;
 }
 
@@ -35,21 +35,22 @@ function serverMessage<F extends string>(
   show(f, err.message);
 }
 
-// The forms mount only while open, so fields start empty and hidden each time.
-export function ChangeUsernameDialog(props: ChangeProps) {
-  return (
-    <ResponsiveDialog
-      open={props.open}
-      onOpenChange={props.onOpenChange}
-      title="Change username"
-      description="You will use the new username to log in on every device."
-    >
-      {props.open && <UsernameForm {...props} />}
-    </ResponsiveDialog>
-  );
-}
+// Views of the Settings modal. Each form mounts when its view opens, so
+// fields start empty and hidden each time.
+export const ACCOUNT_VIEWS = {
+  username: {
+    title: "Change username",
+    description: "You will use the new username to log in on every device.",
+    Form: UsernameForm,
+  },
+  passphrase: {
+    title: "Change passphrase",
+    description: "Other devices will be logged out. This one stays logged in.",
+    Form: PassphraseForm,
+  },
+} as const;
 
-function UsernameForm({ onOpenChange, onSaved }: ChangeProps) {
+function UsernameForm({ onClose, onSaved }: ChangeProps) {
   const actions = useSettingsActions();
   const [username, setUsername] = useState("");
   const [passphrase, setPassphrase] = useState("");
@@ -67,7 +68,7 @@ function UsernameForm({ onOpenChange, onSaved }: ChangeProps) {
     setBusy(true);
     try {
       onSaved(await actions.changeUsername(username, passphrase));
-      onOpenChange(false);
+      onClose();
     } catch (err) {
       setBusy(false);
       serverMessage(err, ["username", "passphrase"] as const, "passphrase", errors.fromServer);
@@ -78,7 +79,7 @@ function UsernameForm({ onOpenChange, onSaved }: ChangeProps) {
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
       <TextField
         label="New username"
-        hint={USERNAME_HINT}
+        hint={`${USERNAME_HINT}.`}
         autoComplete="username"
         autoCapitalize="none"
         autoCorrect="off"
@@ -107,7 +108,7 @@ function UsernameForm({ onOpenChange, onSaved }: ChangeProps) {
         <Button type="submit" disabled={busy}>
           {busy ? "Saving" : "Save username"}
         </Button>
-        <Button variant="text" className="self-center" onClick={() => onOpenChange(false)}>
+        <Button variant="text" className="self-center" onClick={onClose}>
           Cancel
         </Button>
       </DialogActions>
@@ -115,22 +116,9 @@ function UsernameForm({ onOpenChange, onSaved }: ChangeProps) {
   );
 }
 
-export function ChangePassphraseDialog(props: ChangeProps) {
-  return (
-    <ResponsiveDialog
-      open={props.open}
-      onOpenChange={props.onOpenChange}
-      title="Change passphrase"
-      description="Other devices will be logged out. This one stays logged in."
-    >
-      {props.open && <PassphraseForm {...props} />}
-    </ResponsiveDialog>
-  );
-}
-
 type PassField = "current" | "next" | "confirm";
 
-function PassphraseForm({ onOpenChange, onSaved }: ChangeProps) {
+function PassphraseForm({ onClose, onSaved }: ChangeProps) {
   const actions = useSettingsActions();
   const [values, setValues] = useState<Record<PassField, string>>({
     current: "",
@@ -152,7 +140,7 @@ function PassphraseForm({ onOpenChange, onSaved }: ChangeProps) {
     setBusy(true);
     try {
       onSaved(await actions.changePassphrase(values.current, values.next));
-      onOpenChange(false);
+      onClose();
     } catch (err) {
       setBusy(false);
       serverMessage(err, ["current", "next"] as const, "current", errors.fromServer);
@@ -192,7 +180,7 @@ function PassphraseForm({ onOpenChange, onSaved }: ChangeProps) {
         <Button type="submit" disabled={busy}>
           {busy ? "Saving" : "Save passphrase"}
         </Button>
-        <Button variant="text" className="self-center" onClick={() => onOpenChange(false)}>
+        <Button variant="text" className="self-center" onClick={onClose}>
           Cancel
         </Button>
       </DialogActions>

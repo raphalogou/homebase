@@ -2,17 +2,18 @@ import { Dialog } from "@base-ui/react/dialog";
 import type { ReactNode } from "react";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
-import { Sheet } from "./sheet";
+import { type BackAction, BackButton, Sheet } from "./sheet";
 
 interface ResponsiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   /** One muted sentence under the title. */
-  description?: string;
+  description?: string | undefined;
   children: ReactNode;
   /** Desktop width in px. */
   width?: number;
+  back?: BackAction | undefined;
 }
 
 // Approved pattern: a bottom sheet on the phone, a small centred dialog
@@ -24,6 +25,7 @@ export function ResponsiveDialog({
   description,
   children,
   width = 440,
+  back,
 }: ResponsiveDialogProps) {
   const desktop = useIsDesktop();
   if (!desktop) {
@@ -34,6 +36,7 @@ export function ResponsiveDialog({
         title={title}
         description={description}
         showTitle
+        back={back}
       >
         {children}
       </Sheet>
@@ -47,11 +50,10 @@ export function ResponsiveDialog({
           style={{ width: `min(${width}px, calc(100vw - 32px))` }}
           className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-32px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[20px] bg-bg p-7"
         >
-          <Dialog.Title
-            className={cn("text-[26px]/[1.2] font-bold", description ? "mb-1" : "mb-4")}
-          >
-            {title}
-          </Dialog.Title>
+          <div className={cn("flex items-center gap-1", description ? "mb-1" : "mb-4")}>
+            {back && <BackButton back={back} />}
+            <Dialog.Title className="min-w-0 text-[26px]/[1.2] font-bold">{title}</Dialog.Title>
+          </div>
           {description && (
             <Dialog.Description className="mb-5 text-muted-foreground">
               {description}

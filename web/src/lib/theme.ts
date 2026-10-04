@@ -3,6 +3,8 @@
 // preference, not user data, and must be readable synchronously before the
 // app loads, so it is kept in localStorage.
 
+import { useSyncExternalStore } from "react";
+
 export type Theme = "system" | "light" | "dark";
 
 const KEY = "homebase-theme";
@@ -34,4 +36,13 @@ export function setTheme(theme: Theme): void {
   if (theme === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", theme);
   window.homebasePaintTheme?.();
+  window.dispatchEvent(new Event(KEY));
+}
+
+/** The current choice, kept in step between Settings and the rail's menu. */
+export function useTheme(): Theme {
+  return useSyncExternalStore((onChange) => {
+    window.addEventListener(KEY, onChange);
+    return () => window.removeEventListener(KEY, onChange);
+  }, getTheme);
 }

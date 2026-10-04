@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { Kbd } from "@/components/ui/kbd";
 import { useActions } from "@/data/hooks";
 import { cn } from "@/lib/utils";
 import { InboxIcon } from "./icons";
@@ -52,18 +53,31 @@ export function CaptureBar({ fixed = false }: { fixed?: boolean }) {
       <label htmlFor={id} className="sr-only">
         New task
       </label>
-      <Input
-        id={id}
-        value={title}
-        onChange={(e) => {
-          setTitle(e.target.value);
-        }}
-        placeholder="Capture a task"
-        data-capture
-        maxLength={300}
-        autoComplete="off"
-        enterKeyHint="done"
-      />
+      <div className="relative min-w-0 flex-1">
+        <Input
+          id={id}
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+          }}
+          placeholder="Capture a task"
+          data-capture
+          aria-keyshortcuts={fixed ? undefined : "c"}
+          className={cn(!fixed && "pr-12")}
+          maxLength={300}
+          autoComplete="off"
+          enterKeyHint="done"
+        />
+        {/* Desktop only, where C works; hidden once there is text to read. */}
+        {!fixed && !title && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2"
+          >
+            <Kbd>C</Kbd>
+          </span>
+        )}
+      </div>
       <Button
         type="submit"
         variant="primary"

@@ -1,7 +1,10 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { NavLink, Outlet } from "react-router";
+import { Kbd } from "@/components/ui/kbd";
 import { useInbox, useTask } from "@/data/hooks";
+import { useModal } from "@/lib/modal";
 import { useOpenTask } from "@/lib/open-task";
+import { keyFor } from "@/lib/shortcuts";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 import {
@@ -14,9 +17,12 @@ import {
   TodayIcon,
 } from "./icons";
 import { PickDialog } from "./pick-dialog";
+import { RemindersDialog } from "./reminders-dialog";
+import { SettingsDialog } from "./settings-dialog";
 import { Shortcuts } from "./shortcuts";
 import { SyncBanner, SyncRailLine } from "./sync-banner";
 import { TaskPanel, TaskSheet } from "./task-editor";
+import { ThemeToggle } from "./theme-toggle";
 import { Toaster } from "./toaster";
 
 interface NavItem {
@@ -49,6 +55,36 @@ function Badge({ count, className }: { count: number; className?: string }) {
   );
 }
 
+const railItem =
+  "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium hover:bg-soft";
+
+/** A rail button that opens a modal (?settings=1); filled while it is open. */
+function RailModal({ name, label, Icon }: { name: string; label: string; Icon: NavItem["icon"] }) {
+  const [view, open] = useModal(name);
+  return (
+    <button
+      type="button"
+      aria-keyshortcuts={keyFor(name)?.toLowerCase()}
+      onClick={() => open("1")}
+      className={cn(railItem, "text-left", view && "bg-soft font-semibold")}
+    >
+      <Icon size={20} />
+      <span className="flex-1 whitespace-nowrap">{label}</span>
+      <RailKey to={name} />
+    </button>
+  );
+}
+
+/** The shortcut beside a rail link; the link itself carries aria-keyshortcuts. */
+function RailKey({ to }: { to: string }) {
+  const key = keyFor(to);
+  return key ? (
+    <span aria-hidden="true">
+      <Kbd>{key}</Kbd>
+    </span>
+  ) : null;
+}
+
 export function Wordmark() {
   return (
     <p className="text-xl font-bold tracking-[-0.01em]">
@@ -64,7 +100,7 @@ export function AppShell() {
       <div className="min-h-dvh min-[900px]:flex">
         <nav
           aria-label="Main"
-          className="sticky top-0 hidden h-dvh w-[220px] shrink-0 flex-col border-r border-line px-4 pt-10 min-[900px]:flex"
+          className="sticky top-0 hidden h-dvh w-[240px] shrink-0 flex-col border-r border-line px-4 pt-10 min-[900px]:flex"
         >
           <div className="mb-8 px-3">
             <Wordmark />
@@ -75,43 +111,25 @@ export function AppShell() {
                 <NavLink
                   to={to}
                   end={to === "/"}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
-                      isActive && "bg-soft font-semibold",
-                    )
-                  }
+                  aria-keyshortcuts={keyFor(to)?.toLowerCase()}
+                  className={({ isActive }) => cn(railItem, isActive && "bg-soft font-semibold")}
                 >
                   <Icon size={20} />
-                  <span className="flex-1">{label}</span>
+                  <span className="flex-1 whitespace-nowrap">{label}</span>
                   {to === "/inbox" && <Badge count={inbox} />}
                   {to === "/inbox" && inbox > 0 && (
                     <span className="sr-only">, {inbox} waiting</span>
                   )}
+                  <RailKey to={to} />
                 </NavLink>
               </li>
             ))}
           </ul>
           {/* DESIGN.md: Reminders sits at the bottom of the rail; Settings (approved) just above. */}
           <div className="mt-auto mb-8 flex flex-col gap-1">
-            {[
-              { to: "/settings", label: "Settings", Icon: SettingsIcon },
-              { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
-            ].map(({ to, label, Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
-                    isActive && "bg-soft font-semibold",
-                  )
-                }
-              >
-                <Icon size={20} />
-                {label}
-              </NavLink>
-            ))}
+            <RailModal name="settings" label="Settings" Icon={SettingsIcon} />
+            <RailModal name="reminders" label="Reminders" Icon={RemindersIcon} />
+            <ThemeToggle />
             <SyncRailLine />
           </div>
         </nav>
@@ -155,6 +173,8 @@ export function AppShell() {
 
         <TaskSheet />
         <PickDialog />
+        <SettingsDialog />
+        <RemindersDialog />
         <Toaster />
       </div>
     </Shortcuts>

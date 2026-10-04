@@ -168,6 +168,12 @@ export interface ServerSettings {
   tz: string;
   weekStart: 0 | 1;
   calendarUrl: string;
+  /** The server's daily backup, and where it goes. */
+  backups: boolean;
+  backupDir: string;
+  /** HOMEBASE_BACKUP_INTERVAL in whole hours. */
+  backupHours: number;
+  lastBackupAt: number | null;
 }
 
 export interface SessionInfo {

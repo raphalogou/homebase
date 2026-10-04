@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 export const fieldClass =
-  "w-full rounded-lg border border-border-strong bg-field px-4 text-base text-ink placeholder:text-muted-foreground disabled:opacity-50";
+  "w-full rounded-sm border border-border-strong bg-field px-4 text-base text-ink placeholder:text-muted-foreground focus-visible:border-ink focus-visible:ring-[3px] focus-visible:ring-ink/20 focus-visible:outline-none disabled:opacity-50";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(fieldClass, "h-12", className)} {...props} />;

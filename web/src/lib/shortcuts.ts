@@ -1,7 +1,11 @@
 // Desktop keyboard shortcuts (DESIGN.md "Keyboard shortcuts"). Single keys
 // act only when the person is not typing and holds no Ctrl, Alt or Meta.
 
-export type Shortcut = { kind: "capture" } | { kind: "go"; to: string } | { kind: "help" };
+export type Shortcut =
+  | { kind: "capture" }
+  | { kind: "go"; to: string }
+  | { kind: "modal"; name: string }
+  | { kind: "help" };
 
 export const SHORTCUTS: { keys: string; label: string; shortcut: Shortcut | null }[] = [
   { keys: "C", label: "Capture a task", shortcut: { kind: "capture" } },
@@ -10,11 +14,19 @@ export const SHORTCUTS: { keys: string; label: string; shortcut: Shortcut | null
   { keys: "P", label: "Go to Plan", shortcut: { kind: "go", to: "/plan" } },
   { keys: "G", label: "Go to Goals", shortcut: { kind: "go", to: "/goals" } },
   { keys: "R", label: "Weekly review", shortcut: { kind: "go", to: "/review" } },
-  { keys: "S", label: "Settings", shortcut: { kind: "go", to: "/settings" } },
+  { keys: "S", label: "Settings", shortcut: { kind: "modal", name: "settings" } },
   { keys: "?", label: "Show this list", shortcut: { kind: "help" } },
   // Esc is handled by each dialog, sheet and the task panel.
   { keys: "Esc", label: "Close a dialog, sheet or the task panel", shortcut: null },
 ];
+
+/** The key that goes to a path or opens a modal by name, for the hint beside its link. */
+export function keyFor(target: string): string | undefined {
+  return SHORTCUTS.find(
+    ({ shortcut: s }) =>
+      (s?.kind === "go" && s.to === target) || (s?.kind === "modal" && s.name === target),
+  )?.keys;
+}
 
 export interface KeyInput {
   key: string;

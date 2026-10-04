@@ -138,7 +138,7 @@ export default function Plan() {
         onChange={(v) => v === "projects" && navigate("/plan/projects")}
       />
       <div className="mt-6">
-        <WeekStrip selected={day} onSelect={setDay} />
+        <WeekStrip selected={day} onSelect={setDay} shortDays />
       </div>
       <fieldset className="mt-4 -mx-6 flex min-w-0 gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none]">
         <legend className="sr-only">Show</legend>
