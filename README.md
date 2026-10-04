@@ -32,10 +32,8 @@ A calm personal planner for goals, projects and tasks, built to be opened every 
 Requires Go 1.26 or newer, Node 22.18 or newer, and `make`.
 
 ```sh
-# once: store a passphrase hash for development in .env (never committed)
-(cd server && go run ./cmd/homebase hash-passphrase) >> .env
-
 # Go server and Vite dev server together; open http://localhost:5173
+# The first visit shows Set up, where you choose a username and passphrase.
 make dev
 
 # lint, vet, Go tests, web type check and unit tests
@@ -57,11 +55,10 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
    docker build -f deploy/Dockerfile -t homebase .
    ```
 
-2. **Choose a passphrase** and write the settings file:
+2. **Write the settings file:**
 
    ```sh
-   docker run --rm -it homebase hash-passphrase > homebase.env
-   echo 'HOMEBASE_BASE_URL=https://homebase.example.com' >> homebase.env
+   echo 'HOMEBASE_BASE_URL=https://homebase.example.com' > homebase.env
    echo 'HOMEBASE_VAPID_SUBJECT=mailto:you@example.com' >> homebase.env
    chmod 600 homebase.env
    ```
@@ -93,8 +90,7 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
    sudo install -m 755 /tmp/homebase /usr/local/bin/homebase
    sudo useradd --system --home /var/lib/homebase --shell /usr/sbin/nologin homebase
    sudo install -d -m 700 /etc/homebase
-   homebase hash-passphrase | sudo tee /etc/homebase/env > /dev/null
-   echo 'HOMEBASE_BASE_URL=https://homebase.example.com' | sudo tee -a /etc/homebase/env > /dev/null
+   echo 'HOMEBASE_BASE_URL=https://homebase.example.com' | sudo tee /etc/homebase/env > /dev/null
    echo 'HOMEBASE_VAPID_SUBJECT=mailto:you@example.com' | sudo tee -a /etc/homebase/env > /dev/null
    sudo chmod 600 /etc/homebase/env
    ```
@@ -114,7 +110,9 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
 
 **Tailscale** (private, no public exposure): run `tailscale serve --bg 8080` on the server and use the address it prints as `HOMEBASE_BASE_URL`. Your phone and computer need Tailscale running to reach Homebase. The server still needs outbound internet access for the push services.
 
-Then open the address in a browser and log in with your passphrase.
+Then open the address in a browser straight away. The first visit shows **Set up Homebase**, where you choose a username and a passphrase of at least 12 characters; you are then logged in. Until that is done, anyone who reaches the address could do it instead, so do it as soon as the server is up. Both can be changed later in Settings.
+
+To create the account without the browser, for example on a server that is public from the start, put the line from `homebase hash-passphrase` in the settings file before the first start. The account is then created with the username `owner` and that passphrase. An install from before usernames gets the same: log in as `owner` with your passphrase and rename it in Settings. After the account exists the variable is no longer read.
 
 ### Backups
 
@@ -154,7 +152,7 @@ All configuration comes from environment variables.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HOMEBASE_PASSPHRASE_HASH` | none, required | argon2id hash of your passphrase, from `homebase hash-passphrase` |
+| `HOMEBASE_PASSPHRASE_HASH` | none | Optional. Creates the account (username `owner`) on first start, from `homebase hash-passphrase`; ignored once the account exists |
 | `HOMEBASE_DATA` | `./data` | Folder for the database, uploaded files and the push key |
 | `HOMEBASE_ADDR` | `:8080` | Listen address |
 | `HOMEBASE_BASE_URL` | the address requests come to | Public HTTPS address, used in the calendar link |
@@ -176,7 +174,7 @@ homebase backup <dir>        # copies the database, files and push key into <dir
 
 ## Known limits
 
-- Single user, one passphrase. There are no accounts.
+- Single user: one account, with a username and a passphrase.
 - If two devices edit the same task within seconds, the later edit wins whole.
 - Uploading files needs a connection; everything else works offline.
 - Google Calendar refreshes subscribed feeds only every several hours, so changes appear slowly there.

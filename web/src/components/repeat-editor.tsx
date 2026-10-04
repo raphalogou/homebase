@@ -146,7 +146,7 @@ export function RepeatEditor({
                     }}
                     className={cn(
                       "grid size-11 place-items-center rounded-full border text-sm font-semibold",
-                      on ? "border-ink bg-ink text-field" : "border-line bg-field",
+                      on ? "border-ink bg-ink text-field" : "border-border-strong bg-field",
                     )}
                   >
                     {d.letter}

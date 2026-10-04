@@ -21,7 +21,10 @@ import (
 	"homebase/migrations"
 )
 
-const pass = "correct horse battery"
+const (
+	pass = "correct horse battery"
+	user = auth.DefaultUsername
+)
 
 func newServer(t *testing.T) http.Handler {
 	t.Helper()
@@ -31,6 +34,17 @@ func newServer(t *testing.T) http.Handler {
 // newServerWith uses client to reach push services, so a test can point
 // it at a fake one.
 func newServerWith(t *testing.T, client *http.Client) http.Handler {
+	t.Helper()
+	return buildServer(t, client, true)
+}
+
+// newFreshServer has no account yet, as on a new install.
+func newFreshServer(t *testing.T) http.Handler {
+	t.Helper()
+	return buildServer(t, http.DefaultClient, false)
+}
+
+func buildServer(t *testing.T, client *http.Client, withAccount bool) http.Handler {
 	t.Helper()
 	d, err := db.OpenMemory()
 	if err != nil {
@@ -50,9 +64,11 @@ func newServerWith(t *testing.T, client *http.Client) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hash, err := auth.ParseHash(phc)
-	if err != nil {
-		t.Fatal(err)
+	au := auth.New(st, time.Now)
+	if withAccount {
+		if _, err := au.Bootstrap(ctx, phc); err != nil {
+			t.Fatal(err)
+		}
 	}
 	web := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("web")) })
 	blobs, err := files.New(t.TempDir())
@@ -68,7 +84,7 @@ func newServerWith(t *testing.T, client *http.Client) http.Handler {
 		Sender: push.NewSender(keys, "mailto:me@example.com", client, time.Now),
 		Blobs:  blobs,
 		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Auth:   auth.New(st, hash, time.Now),
+		Auth:   au,
 		Sync:   sy,
 		Web:    web,
 	})
@@ -106,7 +122,7 @@ func do(h http.Handler, c call) *httptest.ResponseRecorder {
 
 func login(t *testing.T, h http.Handler) string {
 	t.Helper()
-	rec := do(h, call{method: "POST", path: "/api/login", body: `{"passphrase":"` + pass + `"}`})
+	rec := do(h, call{method: "POST", path: "/api/login", body: `{"username":"` + user + `","passphrase":"` + pass + `"}`})
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("login status = %d: %s", rec.Code, rec.Body)
 	}
@@ -242,8 +258,10 @@ func TestLoginAndLogout(t *testing.T) {
 		body     string
 		wantCode int
 	}{
-		{"wrong passphrase", `{"passphrase":"nope"}`, 401},
-		{"empty passphrase", `{"passphrase":""}`, 400},
+		{"wrong passphrase", `{"username":"owner","passphrase":"nope"}`, 401},
+		{"empty passphrase", `{"username":"owner","passphrase":""}`, 400},
+		{"no username", `{"passphrase":"` + pass + `"}`, 400},
+		{"wrong username", `{"username":"someone","passphrase":"` + pass + `"}`, 401},
 		{"not json", `passphrase`, 400},
 	}
 	for _, tt := range tests {
@@ -267,7 +285,7 @@ func TestLoginAndLogout(t *testing.T) {
 
 func TestLoginRateLimitPerAddress(t *testing.T) {
 	h := newServer(t)
-	wrong := call{method: "POST", path: "/api/login", body: `{"passphrase":"nope"}`, addr: "203.0.113.5:1000"}
+	wrong := call{method: "POST", path: "/api/login", body: `{"username":"owner","passphrase":"nope"}`, addr: "203.0.113.5:1000"}
 	for range auth.MaxLogins {
 		if rec := do(h, wrong); rec.Code != 401 {
 			t.Fatalf("status = %d", rec.Code)
@@ -277,7 +295,7 @@ func TestLoginRateLimitPerAddress(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests || errCode(t, rec) != "rate_limited" || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("sixth attempt: %d %s", rec.Code, rec.Body)
 	}
-	right := call{method: "POST", path: "/api/login", body: `{"passphrase":"` + pass + `"}`, addr: "198.51.100.1:1000"}
+	right := call{method: "POST", path: "/api/login", body: `{"username":"` + user + `","passphrase":"` + pass + `"}`, addr: "198.51.100.1:1000"}
 	if rec := do(h, right); rec.Code != http.StatusNoContent {
 		t.Fatalf("other address: %d", rec.Code)
 	}

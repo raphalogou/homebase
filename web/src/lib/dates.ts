@@ -106,3 +106,13 @@ export function weekRange(first: LocalDate): string {
   const from = fmt(first, sameMonth ? { day: "numeric" } : { day: "numeric", month: "long" });
   return `${from} – ${fmt(last, { day: "numeric", month: "long" })}`;
 }
+
+/** "12 September", with the year when it is not this year's, for a timestamp in tz. */
+export function changedOn(ms: number, tz: string, today: LocalDate): string {
+  const date = todayIn(tz, ms);
+  return fmt(date, {
+    day: "numeric",
+    month: "long",
+    ...(date.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
+  });
+}

@@ -30,6 +30,8 @@ export class LocalStore {
   rev = 0;
   me: Me | null = null;
   signedIn = false;
+  /** A first full sync has finished on this device since the last login. */
+  loaded = false;
 
   /** Type and size of uploaded files, learned from the server, by SHA. */
   fileMeta = new Map<string, { type: string; size: number } | null>();
@@ -60,6 +62,8 @@ export class LocalStore {
     this.rev = (await getMeta(this.db, "rev")) ?? 0;
     this.me = (await getMeta(this.db, "me")) ?? null;
     this.signedIn = (await getMeta(this.db, "signedIn")) ?? false;
+    // Devices from before this flag existed had their data already.
+    this.loaded = (await getMeta(this.db, "loaded")) ?? this.rev > 0;
     this.changed();
   }
 
@@ -218,6 +222,13 @@ export class LocalStore {
     this.changed();
   }
 
+  async setLoaded(): Promise<void> {
+    if (this.loaded) return;
+    this.loaded = true;
+    await setMeta(this.db, "loaded", true);
+    this.changed();
+  }
+
   async setSignedIn(v: boolean): Promise<void> {
     this.signedIn = v;
     await setMeta(this.db, "signedIn", v);
@@ -233,6 +244,7 @@ export class LocalStore {
     this.rev = 0;
     this.me = null;
     this.signedIn = false;
+    this.loaded = false;
     this.changed();
   }
 }

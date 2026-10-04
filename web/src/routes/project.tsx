@@ -5,7 +5,8 @@ import { Attachments } from "@/components/attachments";
 import { BackLink } from "@/components/back-link";
 import { Progress } from "@/components/goal-line";
 import { NotesField } from "@/components/notes-field";
-import { Empty, SectionLabel } from "@/components/section";
+import { SectionLabel } from "@/components/section";
+import { DetailSkeleton, ErrorBlock } from "@/components/states";
 import { StatusAndDelete } from "@/components/status-and-delete";
 import { TaskRow } from "@/components/task-row";
 import { TitleField } from "@/components/title-field";
@@ -17,6 +18,7 @@ import {
   useProjectTasks,
   useStructureActions,
 } from "@/data/structure";
+import { useFirstLoad } from "@/data/sync-status";
 
 export default function ProjectScreen() {
   const { id } = useParams();
@@ -26,15 +28,25 @@ export default function ProjectScreen() {
   const list = useProjectTasks(id ?? "");
   const actions = useActions();
   const structure = useStructureActions();
+  const { loading } = useFirstLoad();
 
   if (!project) {
     return (
       <Columns
         main={
           <>
-            <BackLink to="/plan/projects">Projects</BackLink>
+            <BackLink to="/plan/projects">Plan</BackLink>
             <div className="mt-6">
-              <Empty>This project is not here. It may have been deleted.</Empty>
+              {loading ? (
+                <DetailSkeleton what="project" />
+              ) : (
+                <ErrorBlock
+                  title="This project no longer exists"
+                  action={{ label: "Back to Plan", to: "/plan/projects" }}
+                >
+                  It may have been deleted on another device.
+                </ErrorBlock>
+              )}
             </div>
           </>
         }
@@ -65,6 +77,11 @@ export default function ProjectScreen() {
 
       <section aria-labelledby="project-tasks" className="mt-10">
         <SectionLabel id="project-tasks">Tasks</SectionLabel>
+        {list.length === 0 && (
+          <p className="mb-3 border-t border-line pt-3 text-muted-foreground">
+            No tasks yet. Add the first one.
+          </p>
+        )}
         <AddField
           label="New task in this project"
           placeholder="Add a task"

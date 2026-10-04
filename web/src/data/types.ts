@@ -134,6 +134,13 @@ export interface Me {
   tz: string;
   weekStart: 0 | 1;
   rev: number;
+  /** Kept after a session ends, to fill in Log in. */
+  username: string;
+}
+
+export interface AccountInfo {
+  username: string;
+  passphraseChangedAt: number;
 }
 
 export type ReminderInput = Pick<Reminder, "slot" | "enabled" | "atLocal" | "kind">;

@@ -1,6 +1,5 @@
 # /etc/systemd/system/homebase.service
-# The passphrase hash goes in /etc/homebase/env (mode 600), for example:
-#   HOMEBASE_PASSPHRASE_HASH='$argon2id$v=19$...'
+# Settings go in /etc/homebase/env (mode 600), for example:
 #   HOMEBASE_BASE_URL=https://homebase.example.com
 #   HOMEBASE_VAPID_SUBJECT=mailto:you@example.com
 

@@ -92,10 +92,18 @@ type Tx interface {
 	ReviewDone(weekStart string) (bool, error)
 	LogReview(weekStart string, doneAt int64) error
 
+	// Account returns ErrNotFound until setup has run.
+	Account() (Account, error)
+	InsertAccount(Account) error
+	SetUsername(username string) error
+	SetPassphraseHash(hash string, changedAt int64) error
+
 	Session(tokenHash string) (Session, error)
 	InsertSession(Session) error
 	TouchSession(tokenHash string, lastSeen int64) error
 	Sessions() ([]Session, error)
 	SetCalendarToken(token string) error
 	DeleteSession(tokenHash string) error
+	// DeleteSessionsExcept ends every session but the one with keepHash.
+	DeleteSessionsExcept(keepHash string) error
 }

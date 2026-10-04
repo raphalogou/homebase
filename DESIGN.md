@@ -24,37 +24,34 @@ Rules:
 
 ## Tokens
 
-### Colour (light theme, drawn)
+### Colour
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--bg` | `#F2F3EF` | Page background |
-| `--field` | `#FAFAF8` | Inputs, raised rows, buttons on the page |
-| `--ink` | `#15191A` | Text, primary buttons, checked states |
-| `--muted` | `#646B66` | Secondary text, inactive nav, section labels |
-| `--line` | `#D6D9D3` | Hairlines between rows, input borders |
-| `--soft` | `#E5E7E1` | Selected rail item, segmented track, icon boxes |
-| `--soft-day` | `#E0E3DC` | Selected day in the week strip |
-| `--dashed` | `#AEB3AC` | Dashed "add" and drop areas |
-| `--highlight` | `#F2E94E` | The highlighter mark only |
-| `--danger` | `#9A3B12` | Only a refused login (owner's request): the field's 2 px border and focus outline, the message and its warning icon. 6.3:1 on `--bg`. Nothing else turns this colour. |
-| `--notif-bg` / `--notif-card` | `#1B1C1F` / `#2E3034` | Notification preview (always dark) |
+Every colour is a CSS variable on `:root`, redefined for dark under `@media (prefers-color-scheme: dark)` guarded as `:root:not([data-theme="light"])`, and again under `:root[data-theme="dark"]`. Components use the tokens only.
 
-Text on `--bg` and `--field` must stay at 4.5:1 or better (3:1 for text 24 px and up). Verify `--muted` after any change.
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--bg` | `#F2F3EF` | `#121514` | Page background |
+| `--field` | `#FAFAF8` | `#1A1E1D` | Inputs, raised rows, buttons on the page |
+| `--ink` | `#15191A` | `#ECEFEA` | Text, primary buttons, checked states |
+| `--muted` | `#5E655F` | `#9AA29C` | Secondary text, inactive nav, section labels |
+| `--line` | `#D6D9D3` | `#2C3230` | Hairlines between rows. Decoration only (1.3:1 light, 1.4:1 dark) |
+| `--border` | `#868D87` | `#6A736D` | Borders of controls: inputs, selects, chips, small buttons, dashed "add" and drop areas, the toggle's off track, key caps (3:1 or better) |
+| `--soft` | `#E5E7E1` | `#232927` | Selected rail item, segmented track, icon boxes, banners |
+| `--soft-day` | `#E0E3DC` | `#2A312E` | Selected day in the week strip |
+| `--highlight` | `#F2E94E` | `#6E6616` | The highlighter mark only |
+| `--highlight-text` | `#15191A` | `#ECEFEA` | Text on the mark |
+| `--veil` | ink at 30 % | black at 60 % | Behind sheets and dialogs |
+| `--notif-bg` / `--notif-card` | `#1B1C1F` / `#2E3034` | the same | Notification preview (always dark) |
 
-### Colour (dark theme, proposed, not drawn)
+Text on `--bg` and `--field` must stay at 4.5:1 or better (3:1 for text 24 px and up). Measured: light `--muted` 5.4:1 on `--bg` and 4.8:1 on `--soft`; dark ink 15.8:1 on `--bg`, muted 7.0:1 on `--bg` and 5.7:1 on `--soft`, ink on the dark mark 5.1:1 (the band 3.1:1 against `--bg`). Verify after any change. Nothing is red: failures use an icon, a bold title and plain words in ink.
 
-Not designed yet; treat as a starting point and show the user before shipping.
+### Dark theme
 
-| Token | Proposed |
-| --- | --- |
-| `--bg` | `#121514` |
-| `--field` | `#1A1E1D` |
-| `--ink` | `#ECEFEA` |
-| `--muted` | `#9AA29C` |
-| `--line` | `#2C3230` |
-| `--soft` | `#232927` |
-| `--highlight` | `#F2E94E`, with the marked text switched to `#15191A` so it stays readable |
+- It follows `prefers-color-scheme`, with System, Light and Dark under "Time and week" in Settings, for this device only. `public/theme.js` applies the choice before first paint (a blocking same-origin script, since the Content-Security-Policy forbids inline ones) and sets `<meta name="theme-color">` to `#F2F3EF` or `#121514`.
+- The highlighter turns dim gold and the text stays light. The mark covers only the lower half of the title, so dark text on bright yellow would leave the top half of every letter on the dark page. Only `--ink` text sits on the mark.
+- No pure black or white. Depth comes from the step between `--bg`, `--field` and `--soft`.
+- Primary buttons invert: `--ink` fill, `--bg` text. Images and thumbnails are never tinted.
+- The lifted drag row uses `0 8px 24px rgba(0,0,0,.5)` plus a 1 px `--line` ring.
 
 ### Type
 
@@ -117,7 +114,9 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 - **Attachment row:** a 44 px icon box (note, link, file, image), a title, a one-line meta ("PDF, 240 KB"), and a remove button. Beneath the list: "Add link", "Add note", "Upload file". Desktop adds a dashed drop area.
 - **Toggle:** 52 by 32 px; ink track when on.
 - **Buttons:** primary is ink fill with light text, 52 px tall, radius 12; secondary is a 1 px ink outline; text buttons are 600 weight with an underline offset of 3 px. No arrows appended to labels.
-- **Inputs:** `--field` fill, 1 px `--line` border, radius 12, 48 px tall, always with a visible or screen-reader label. Focus shows a 2 px ink outline with 2 px offset.
+- **Inputs:** `--field` fill, 1 px `--border` border, radius 12, 48 px tall, always with a visible or screen-reader label. Focus shows a 2 px ink outline with 2 px offset. A field in error gets a 2 px ink border and its message under it in ink, shown only after the person leaves the field or presses the button; what they typed is never cleared.
+- **Passphrase fields:** every one has the eye toggle, a 44 px icon button inside the right end (Lucide `eye` while hidden, `eye-off` while shown; `aria-label` "Show passphrase" or "Hide passphrase" with `aria-pressed`). Fields start hidden each time a screen opens, the choice is never stored, and each toggles on its own. Toggling keeps the caret and the value. Autocapitalise, autocorrect and spellcheck are off; autofill is `username`, `current-password` on Log in and `new-password` for new passphrases.
+- **Dialogs:** a bottom sheet on the phone, a small centred dialog (radius 20) on desktop, with the title, an optional muted sentence, then the form. Desktop puts the primary button right and a text "Cancel" before it; the phone stacks them.
 - **Toast:** approved. An ink bar with light text, an 18 px icon, one line (wrapping when a message needs it), radius 12, at most five stacked, 4 s (6 s with an action). Phone: above the tab bar, or above the capture bar where there is one. Desktop: bottom left of the main column. It confirms what leaves the screen (captured, planned, made a project, uploaded, deleted) and says why something was refused (day full, upload failed). Removing from today and every delete offer Undo; making a project offers Open. Never red.
 - **Notification preview:** dark card, a rounded square with a bold "H" carrying the highlighter, app name and time, a 600 title and a body.
 
@@ -128,15 +127,18 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 | Today | `/` | Date and "Today"; Goals (all open goals as serif lines); Your three; capture bar. Desktop right column: goals with progress, this week strip, review link. Review link appears from Friday until done. |
 | Choose up to three | A modal over the current screen (`?pick=1`; `/pick` redirects): a bottom sheet on the phone, a centred dialog on desktop; desktop also keeps the inline suggestions. Reached from the dashed slot and from a "Change" text link beside "Your three", which shows even when the day is full. Unticking removes a task from today. | Groups: Due soon, In progress, Moved a few times. Tick tasks; button "Set today (2 chosen)". |
 | Inbox | `/inbox` | "Captured, not yet placed". Approved: each item has the done checkbox before its title (ticking it says "Done" in a toast with Undo, since a done task leaves the Inbox) and chips with an icon and a verb, "Do today", "Pick a day", "Add to a goal" and "Make it a project", wrapping to two rows on the phone. Desktop shows today's three alongside. |
-| Plan, Tasks | `/plan` | Tasks and Projects switch; week strip; chips Everything, Due this week, Standalone, Repeating; tasks grouped by day, then Repeating. Desktop adds a "New task" form (task, goal, plan for, repeat). |
+| Plan, Tasks | `/plan` | Tasks and Projects switch; week strip; chips Everything, Due this week, Standalone, Repeating; tasks grouped by day, then Repeating. Desktop adds a "New task" form (task, goal, plan for, repeat); the phone has a plus button beside the title ("Add task") that opens the same form in a sheet. |
 | Plan, Projects | `/plan/projects` | Projects grouped under their goal with a progress line and the next task. Approved: a flag before each goal heading, a folder before each project, and a meta line of icons with counts (tasks done, attachments, "Notes" when it has notes). Desktop adds "Add a project". On the phone it is the desktop list in one column. |
 | Project | `/projects/:id` | Title, progress, Tasks with an add field, Notes (editable), Attachments. |
 | Goal | `/goals/:id` | Serif title, progress, Projects, Tasks on their own, Notes, Links. Desktop shows the goal list on the left. |
 | Goals | `/goals` | Goal lines, then the approved "New goal" field under the list: a labelled field in the serif (placeholder "A statement of intent") and an ink "Add" button. |
 | Weekly review | `/review` | One-sentence summary in serif; "Gone quiet" with Keep, Pause, Drop; "Next week" shows a goal with nothing done and "Plan a task"; button "Finish review". Built as: Keep is chosen by default; "Plan a task" opens the goal. The link on Today (from Friday until done) is a bordered row with the review icon, in the right column on desktop and under Your three on the phone; the rail lists "Weekly review" after Goals. |
-| Settings | `/settings` | Approved: one plain page. "Time and week" (zone select, Monday or Sunday), "Calendar" (what the link is for, the link with Copy, "Make a new link"), "Sessions" (each browser with when it was last used and "Log out" for others), then "Log out of this device". Rail: above Reminders at the bottom. Phone: a link beside Reminders at the foot of Today. |
+| Settings | `/settings` | Approved: one plain page. "Time and week" (zone select, Monday or Sunday, and Theme: System, Light or Dark on this device), "Calendar" (what the link is for, the link with Copy, "Make a new link"), "Account" (Username with the current name and "Change"; Passphrase with "Changed 12 September" and "Change"), "Sessions" (each browser with when it was last used and "Log out" for others), then "Log out of this device", and on desktop a "Keyboard shortcuts" text button. Rail: above Reminders at the bottom. Phone: a link beside Reminders at the foot of Today. |
 | Reminders | `/reminders` | Three slots (time, on or off, kind, description); devices; "Send a test now". Built as: one row per slot with the time as a 34 px tabular time input (a complete time saves at once), the kind name and a one-line description, and the 52 by 32 toggle; a line under the title says which zone the times use. "This device" shows its state (not supported, blocked, off with "Get reminders on this device", on with "Send a test now" and "Turn off on this device"). "Other devices" lists the rest with when each was last reached and a Remove button. Desktop reaches it from the bottom of the rail; the phone from a "Reminders" link at the foot of Today, since the tab bar has four places. |
-| Login | `/login` | Approved: the same top-aligned column as other screens. Highlighted wordmark, 36 px "Log in", one muted sentence, a labelled passphrase field, a full-width primary "Log in". A wrong passphrase shows a plain ink sentence under the field. |
+| Set up | `/setup` | Only until the account exists; every other route leads here on a fresh install. The same column as Log in: wordmark, 36 px "Set up Homebase", "Choose how you will log in. There is one account, just for you.", Username, Passphrase (hint "At least 12 characters. Several random words work well."), Confirm passphrase, a full-width primary "Create account", and a small line "You can change both later in Settings." It logs in and opens Today. |
+| Log in | `/login` | The same top-aligned column as other screens. Highlighted wordmark, 36 px "Log in", "Enter your username and passphrase.", Username and Passphrase, a full-width primary "Log in" (it reads "Logging in" and is disabled while waiting). A wrong pair shows "That username or passphrase did not match." under the passphrase, never saying which; after five failures, "Too many attempts. Try again in 10 minutes." When the session ended rather than a logout, a `--soft` notice sits above the fields ("Your session ended", "Log in again. Changes made offline are kept and will sync.") and the username is filled in. |
+| Change username | sheet or dialog from Settings | "You will use the new username to log in on every device." New username, Your passphrase, primary "Save username", text "Cancel". |
+| Change passphrase | sheet or dialog from Settings | "Other devices will be logged out. This one stays logged in." Current passphrase, New passphrase (with the hint), Confirm new passphrase, primary "Save passphrase", text "Cancel". |
 
 ## Copy
 
@@ -157,9 +159,48 @@ None, except: the bottom sheet slide (180 ms), the lift of a dragged row, and fo
 - Colours that must be told apart also differ in lightness. Focus is always visible.
 - Drag and drop always has a keyboard alternative (up and down buttons).
 
-## Not designed yet
+## States
 
-Dark theme, empty, loading and error states, and the offline indicator. Design these in this style and show the owner before building.
+- **Empty:** says what the thing is and offers one action. No illustrations.
+- **Loading:** the local copy shows at once. Skeleton bars in `--soft` appear only until the first sync after logging in, with `aria-busy="true"`; a slow pulse, off with reduced motion. No spinners.
+- **Error:** an icon, a bold title and one or two plain sentences, in ink. With data on screen, the top banner (see below); with nothing to show, the inline block with "Try again".
+
+| Screen | Empty | Loading | Error |
+| --- | --- | --- | --- |
+| Today | Goals: "No goals yet." in the serif, "A goal is the reason behind your tasks. Start with one or two." and "Add a goal". Your three: "Pick up to three things that would make today a good day." over the "Choose your first" slot | goal lines and task rows | "Could not load your tasks", "Check your connection, then try again. Nothing has been lost.", "Try again" |
+| Inbox | "Inbox is clear." "Anything you capture lands here until you place it." | task rows | as Today |
+| Plan, tasks | phone "Nothing planned." "Use the plus to add a task."; desktop "No tasks here." "Type one in the New task form, or capture it from Today." | task rows | as Today |
+| Plan, projects | "No projects yet." "A project groups tasks toward a goal, like a trip or a course." with "Add a project", which focuses the add form | lines | "Could not load your projects" |
+| Goals | "No goals yet." in the serif, then the New goal field | lines | "Could not load your goals" |
+| Project | "No tasks yet. Add the first one.", "No notes yet." with "Add notes", "Links, notes and files for this item." | title, progress and rows | "This project no longer exists", "It may have been deleted on another device.", "Back to Plan" |
+| Goal | "No projects or tasks yet." plus the add fields | as Project | "This goal no longer exists" with "Back to Goals" |
+| Weekly review | "Nothing has gone quiet this week." | lines | "Could not load the review" with "Try again" |
+| Reminders | the device states | lines | "Could not save that change." under the slot, which goes back to its saved value |
+| Settings | not applicable | lines for the calendar link and sessions | "Could not save. Try again." under the control |
+
+Uploads that fail stay under the attachment buttons, with the file name in the bold title ("Course map.png did not upload") and "That file is over 25 MB. Choose a smaller one." or "The file did not upload. Try again."
+
+## Offline and sync indicator
+
+- A banner across the top of the main column, above the page header: `--soft` fill, an icon, a bold lead and a muted sentence (on one line on desktop, the lead on its own line on the phone). It pushes content down and never covers it, and is announced politely.
+- "Offline. Changes are saved on this phone (computer) and will sync when you reconnect. 2 waiting." and "Could not sync. Your changes are saved here. Trying again in 30 seconds." with a text "Retry".
+- Nothing while synced. "Syncing" only once a sync has taken a second, and in the banner only while recovering from trouble; then "Back online. Synced." for 3 seconds.
+- The desktop rail repeats it in one quiet line under Reminders: "Offline, 2 waiting", "Could not sync", "Syncing".
+- Before the first sync has finished there is nothing on screen to keep, so the screen's error block speaks instead of the banner.
+
+## Keyboard shortcuts (desktop)
+
+| Key | Action |
+| --- | --- |
+| C | Focus the capture field (the New task field on Plan; elsewhere it opens Today) |
+| T, I, P, G | Go to Today, Inbox, Plan, Goals |
+| R | Weekly review |
+| S | Settings |
+| ? | Show the list |
+| Esc | Close a dialog, sheet or the task panel |
+
+- Single keys act only when focus is not in an input, textarea, select or editable element, no Ctrl, Alt or Meta key is held, and no dialog is open.
+- The list is a centred dialog (radius 20, 420 px wide), each key in a small bordered key cap. It traps focus and returns it on close. Settings has a "Keyboard shortcuts" text button so it can be found without knowing `?`.
 
 The repeat picker is approved: it grows in place under "Repeat" in the task form. Without a rule, "Does not repeat" and a "Make it repeat" button (every week, from when it is done). With one: a number and a unit, "Counts from" (When it's done, The due date), weekday circles when weekly from the due date, "Ends" (Never, On a date), a summary sentence in the serif, and "Stop repeating". It saves as it changes.
 

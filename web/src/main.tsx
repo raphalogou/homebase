@@ -19,25 +19,29 @@ import ProjectScreen from "@/routes/project";
 import Reminders from "@/routes/reminders";
 import Review from "@/routes/review";
 import Settings from "@/routes/settings";
+import Setup from "@/routes/setup";
 import Today from "@/routes/today";
 
-function SignedIn() {
-  const { auth } = useAuth();
-  return auth === "signedIn" ? <Outlet /> : <Navigate to="/login" replace />;
-}
+// Each guard sends the person to the one screen their state allows:
+// Set up on a fresh install, Log in when signed out, the app otherwise.
+const HOME = { setup: "/setup", signedOut: "/login", signedIn: "/", loading: "/" } as const;
 
-function SignedOut() {
+function Only({ state }: { state: "setup" | "signedOut" | "signedIn" }) {
   const { auth } = useAuth();
-  return auth === "signedIn" ? <Navigate to="/" replace /> : <Outlet />;
+  return auth === state ? <Outlet /> : <Navigate to={HOME[auth]} replace />;
 }
 
 const router = createBrowserRouter([
   {
-    element: <SignedOut />,
+    element: <Only state="setup" />,
+    children: [{ path: "/setup", element: <Setup /> }],
+  },
+  {
+    element: <Only state="signedOut" />,
     children: [{ path: "/login", element: <Login /> }],
   },
   {
-    element: <SignedIn />,
+    element: <Only state="signedIn" />,
     children: [
       {
         element: <AppShell />,

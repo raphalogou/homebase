@@ -98,25 +98,129 @@ func truncate(s string, n int) string {
 	return string([]rune(s)[:n])
 }
 
+// maxSecret bounds passphrases at the boundary, well above the 1000
+// characters a new one may have, so argon2 never hashes megabytes.
+const maxSecret = 4096
+
 func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Username   string `json:"username"`
 		Passphrase string `json:"passphrase"`
 	}
 	if err := decode(w, r, smallBody, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	if req.Passphrase == "" || len(req.Passphrase) > 1024 {
-		s.writeError(w, r, apperr.New(apperr.Invalid, "Enter your passphrase."))
+	switch {
+	case strings.TrimSpace(req.Username) == "" || len(req.Username) > 200:
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "username", "Enter your username."))
+		return
+	case req.Passphrase == "" || len(req.Passphrase) > maxSecret:
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "passphrase", "Enter your passphrase."))
 		return
 	}
-	token, err := s.Auth.Login(r.Context(), req.Passphrase, clientAddr(r), truncate(r.UserAgent(), 200))
+	token, err := s.Auth.Login(r.Context(), req.Username, req.Passphrase, clientAddr(r), truncate(r.UserAgent(), 200))
 	if err != nil {
 		s.writeError(w, r, err)
 		return
 	}
 	setCookie(w, token)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) handleSetupNeeded(w http.ResponseWriter, r *http.Request) {
+	needed, err := s.Auth.SetupNeeded(r.Context())
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, s.Log, http.StatusOK, map[string]bool{"needed": needed})
+}
+
+func (s *server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username   string `json:"username"`
+		Passphrase string `json:"passphrase"`
+	}
+	if err := decode(w, r, smallBody, &req); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	if len(req.Username) > 200 {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "username", "Use 3 to 32 letters, numbers, dots or dashes."))
+		return
+	}
+	if len(req.Passphrase) > maxSecret {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "passphrase", "Use at most 1000 characters."))
+		return
+	}
+	token, err := s.Auth.Setup(r.Context(), req.Username, req.Passphrase, clientAddr(r), truncate(r.UserAgent(), 200))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	setCookie(w, token)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) handleAccount(w http.ResponseWriter, r *http.Request) {
+	info, err := s.Auth.Account(r.Context())
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, s.Log, http.StatusOK, info)
+}
+
+func (s *server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username   string `json:"username"`
+		Passphrase string `json:"passphrase"`
+	}
+	if err := decode(w, r, smallBody, &req); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	if len(req.Username) > 200 {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "username", "Use 3 to 32 letters, numbers, dots or dashes."))
+		return
+	}
+	if req.Passphrase == "" || len(req.Passphrase) > maxSecret {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "passphrase", "Enter your passphrase."))
+		return
+	}
+	info, err := s.Auth.ChangeUsername(r.Context(), req.Username, req.Passphrase, clientAddr(r))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, s.Log, http.StatusOK, info)
+}
+
+func (s *server) handleChangePassphrase(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Current string `json:"current"`
+		Next    string `json:"next"`
+	}
+	if err := decode(w, r, smallBody, &req); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	if req.Current == "" || len(req.Current) > maxSecret {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "current", "Enter your current passphrase."))
+		return
+	}
+	if len(req.Next) > maxSecret {
+		s.writeError(w, r, apperr.ForField(apperr.Invalid, "next", "Use at most 1000 characters."))
+		return
+	}
+	c, _ := r.Cookie(cookieName) // the session middleware has checked it
+	info, err := s.Auth.ChangePassphrase(r.Context(), c.Value, req.Current, req.Next, clientAddr(r))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, s.Log, http.StatusOK, info)
 }
 
 func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -130,13 +234,23 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleMe adds the username to the settings, so a device can prefill it
+// on Log in after its session ends.
 func (s *server) handleMe(w http.ResponseWriter, r *http.Request) {
 	me, err := s.Sync.Me(r.Context())
 	if err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	writeJSON(w, s.Log, http.StatusOK, me)
+	acc, err := s.Auth.Account(r.Context())
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, s.Log, http.StatusOK, struct {
+		syncer.Me
+		Username string `json:"username"`
+	}{me, acc.Username})
 }
 
 func queryInt(r *http.Request, name string, fallback int64) (int64, error) {

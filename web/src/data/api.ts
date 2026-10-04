@@ -2,6 +2,7 @@
 // this folder instead.
 
 import type {
+  AccountInfo,
   Attachment,
   Device,
   Me,
@@ -21,12 +22,15 @@ import type {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** The request field the message belongs to, when the server names one. */
+  readonly field: string;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, field = "") {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.field = field;
   }
 }
 
@@ -63,8 +67,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new NetworkError(err);
   }
   if (!res.ok) {
-    const e = (data as { error?: { code?: string; message?: string } }).error;
-    throw new ApiError(res.status, e?.code ?? "unknown", e?.message ?? "Something went wrong.");
+    const e = (data as { error?: { code?: string; message?: string; field?: string } }).error;
+    throw new ApiError(
+      res.status,
+      e?.code ?? "unknown",
+      e?.message ?? "Something went wrong.",
+      e?.field ?? "",
+    );
   }
   return data as T;
 }
@@ -97,7 +106,16 @@ async function upload(form: FormData) {
 }
 
 export const api = {
-  login: (passphrase: string) => request<void>("POST", "/api/login", { passphrase }),
+  login: (username: string, passphrase: string) =>
+    request<void>("POST", "/api/login", { username, passphrase }),
+  setupNeeded: async () => (await request<{ needed: boolean }>("GET", "/api/setup")).needed,
+  setup: (username: string, passphrase: string) =>
+    request<void>("POST", "/api/setup", { username, passphrase }),
+  account: () => request<AccountInfo>("GET", "/api/account"),
+  changeUsername: (username: string, passphrase: string) =>
+    request<AccountInfo>("PUT", "/api/account/username", { username, passphrase }),
+  changePassphrase: (current: string, next: string) =>
+    request<AccountInfo>("PUT", "/api/account/passphrase", { current, next }),
   logout: () => request<void>("POST", "/api/logout"),
   me: () => request<Me>("GET", "/api/me"),
   pull: (since: number, limit = 500) =>

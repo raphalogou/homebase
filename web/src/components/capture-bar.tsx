@@ -59,6 +59,7 @@ export function CaptureBar({ fixed = false }: { fixed?: boolean }) {
           setTitle(e.target.value);
         }}
         placeholder="Capture a task"
+        data-capture
         maxLength={300}
         autoComplete="off"
         enterKeyHint="done"

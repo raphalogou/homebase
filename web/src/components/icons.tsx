@@ -9,7 +9,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  CircleCheck,
   ClipboardCheck,
+  CloudOff,
+  Eye,
+  EyeOff,
   FileText,
   Flag,
   FolderClosed,
@@ -17,18 +21,21 @@ import {
   GripVertical,
   Image,
   Inbox,
+  Keyboard,
   Link,
   ListChecks,
+  LogOut,
   type LucideIcon,
   type LucideProps,
   NotebookPen,
   Paperclip,
+  Plus,
+  RefreshCw,
   Repeat,
   Settings,
   StickyNote,
   Sun,
   Trash2,
-  TriangleAlert,
   Undo2,
   X,
 } from "lucide-react";
@@ -72,4 +79,11 @@ export const UndoIcon = icon(Undo2);
 export const RemindersIcon = icon(Bell);
 export const ReviewIcon = icon(ClipboardCheck);
 export const SettingsIcon = icon(Settings);
-export const WarningIcon = icon(TriangleAlert);
+export const ShowIcon = icon(Eye);
+export const HideIcon = icon(EyeOff);
+export const OfflineIcon = icon(CloudOff);
+export const SyncedIcon = icon(CircleCheck);
+export const SyncingIcon = icon(RefreshCw);
+export const KeyboardIcon = icon(Keyboard);
+export const LogOutIcon = icon(LogOut);
+export const AddIcon = icon(Plus);

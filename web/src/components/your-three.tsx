@@ -152,8 +152,7 @@ export function YourThree({ tasks, onToggle, onMove, grip }: YourThreeProps) {
               className={cn(
                 "relative",
                 drag && !lifted && "transition-transform duration-150",
-                lifted &&
-                  "z-10 rounded-[12px] bg-field shadow-[0_8px_24px_rgba(20,25,24,.16)] [&>div]:border-transparent",
+                lifted && "z-10 rounded-[12px] bg-field shadow-lift [&>div]:border-transparent",
               )}
             >
               <TaskRow

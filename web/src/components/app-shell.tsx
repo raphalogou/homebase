@@ -14,6 +14,8 @@ import {
   TodayIcon,
 } from "./icons";
 import { PickDialog } from "./pick-dialog";
+import { Shortcuts } from "./shortcuts";
+import { SyncBanner, SyncRailLine } from "./sync-banner";
 import { TaskPanel, TaskSheet } from "./task-editor";
 import { Toaster } from "./toaster";
 
@@ -58,20 +60,47 @@ export function Wordmark() {
 export function AppShell() {
   const inbox = useInbox().length;
   return (
-    <div className="min-h-dvh min-[900px]:flex">
-      <nav
-        aria-label="Main"
-        className="sticky top-0 hidden h-dvh w-[220px] shrink-0 flex-col border-r border-line px-4 pt-10 min-[900px]:flex"
-      >
-        <div className="mb-8 px-3">
-          <Wordmark />
-        </div>
-        <ul className="flex flex-col gap-1">
-          {[...NAV, ...RAIL_EXTRA].map(({ to, label, icon: Icon }) => (
-            <li key={to}>
+    <Shortcuts>
+      <div className="min-h-dvh min-[900px]:flex">
+        <nav
+          aria-label="Main"
+          className="sticky top-0 hidden h-dvh w-[220px] shrink-0 flex-col border-r border-line px-4 pt-10 min-[900px]:flex"
+        >
+          <div className="mb-8 px-3">
+            <Wordmark />
+          </div>
+          <ul className="flex flex-col gap-1">
+            {[...NAV, ...RAIL_EXTRA].map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={to === "/"}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
+                      isActive && "bg-soft font-semibold",
+                    )
+                  }
+                >
+                  <Icon size={20} />
+                  <span className="flex-1">{label}</span>
+                  {to === "/inbox" && <Badge count={inbox} />}
+                  {to === "/inbox" && inbox > 0 && (
+                    <span className="sr-only">, {inbox} waiting</span>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+          {/* DESIGN.md: Reminders sits at the bottom of the rail; Settings (approved) just above. */}
+          <div className="mt-auto mb-8 flex flex-col gap-1">
+            {[
+              { to: "/settings", label: "Settings", Icon: SettingsIcon },
+              { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
+            ].map(({ to, label, Icon }) => (
               <NavLink
+                key={to}
                 to={to}
-                end={to === "/"}
                 className={({ isActive }) =>
                   cn(
                     "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
@@ -80,75 +109,55 @@ export function AppShell() {
                 }
               >
                 <Icon size={20} />
-                <span className="flex-1">{label}</span>
-                {to === "/inbox" && <Badge count={inbox} />}
-                {to === "/inbox" && inbox > 0 && <span className="sr-only">, {inbox} waiting</span>}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-        {/* DESIGN.md: Reminders sits at the bottom of the rail; Settings (approved) just above. */}
-        <div className="mt-auto mb-8 flex flex-col gap-1">
-          {[
-            { to: "/settings", label: "Settings", Icon: SettingsIcon },
-            { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
-          ].map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
-                  isActive && "bg-soft font-semibold",
-                )
-              }
-            >
-              <Icon size={20} />
-              {label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
-
-      <div className="min-w-0 flex-1">
-        <Outlet />
-      </div>
-
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] min-[900px]:hidden"
-      >
-        <ul className="grid h-[72px] grid-cols-4">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <li key={to}>
-              <NavLink
-                to={to}
-                end={to === "/"}
-                className={({ isActive }) =>
-                  cn(
-                    "relative flex h-full flex-col items-center justify-center gap-1 border-t-2 border-transparent text-xs font-medium text-muted-foreground",
-                    isActive && "border-ink font-semibold text-ink",
-                  )
-                }
-              >
-                <span className="relative">
-                  <Icon size={24} />
-                  {to === "/inbox" && (
-                    <Badge count={inbox} className="absolute -top-1.5 -right-3" />
-                  )}
-                </span>
                 {label}
-                {to === "/inbox" && inbox > 0 && <span className="sr-only">, {inbox} waiting</span>}
               </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+            ))}
+            <SyncRailLine />
+          </div>
+        </nav>
 
-      <TaskSheet />
-      <PickDialog />
-      <Toaster />
-    </div>
+        <div className="min-w-0 flex-1">
+          <Outlet />
+        </div>
+
+        <nav
+          aria-label="Main"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] min-[900px]:hidden"
+        >
+          <ul className="grid h-[72px] grid-cols-4">
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={to === "/"}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative flex h-full flex-col items-center justify-center gap-1 border-t-2 border-transparent text-xs font-medium text-muted-foreground",
+                      isActive && "border-ink font-semibold text-ink",
+                    )
+                  }
+                >
+                  <span className="relative">
+                    <Icon size={24} />
+                    {to === "/inbox" && (
+                      <Badge count={inbox} className="absolute -top-1.5 -right-3" />
+                    )}
+                  </span>
+                  {label}
+                  {to === "/inbox" && inbox > 0 && (
+                    <span className="sr-only">, {inbox} waiting</span>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <TaskSheet />
+        <PickDialog />
+        <Toaster />
+      </div>
+    </Shortcuts>
   );
 }
 
@@ -177,6 +186,7 @@ export function Columns({ main, side, capture = false }: ColumnsProps) {
           capture ? "pb-[168px]" : "pb-[104px]",
         )}
       >
+        <SyncBanner />
         <div className="mx-auto w-full max-w-[780px]">{main}</div>
       </main>
       {right && (

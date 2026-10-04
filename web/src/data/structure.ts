@@ -347,7 +347,8 @@ export function useStructureActions() {
        * attachment row comes back and joins the local copy.
        */
       async upload(owner: Owner, file: File): Promise<void> {
-        if (file.size > 25 * 1024 * 1024) throw new ActionError("Files can be at most 25 MB.");
+        if (file.size > 25 * 1024 * 1024)
+          throw new ActionError("That file is over 25 MB. Choose a smaller one.");
         if (file.size === 0) throw new ActionError("That file is empty.");
         try {
           // An owner made offline must reach the server before its file can.
@@ -368,7 +369,9 @@ export function useStructureActions() {
             const msg =
               err.status === 404
                 ? "Sync first: the server does not have this yet. Try again in a moment."
-                : err.message;
+                : err.status === 413
+                  ? "That file is over 25 MB. Choose a smaller one."
+                  : "The file did not upload. Try again.";
             throw new ActionError(msg);
           }
           throw err;

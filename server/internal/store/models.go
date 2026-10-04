@@ -111,6 +111,13 @@ type PushSub struct {
 	LastOK    *int64
 }
 
+// Account is the single account. ChangedAt is when the passphrase was set.
+type Account struct {
+	Username       string
+	PassphraseHash string
+	ChangedAt      int64
+}
+
 type Session struct {
 	TokenHash string
 	Label     string

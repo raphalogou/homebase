@@ -38,11 +38,13 @@ func (c Code) Status() int {
 }
 
 // Error is an error the client is allowed to see. Reason is a short machine
-// value such as "day_full"; Message is a sentence for people.
+// value such as "day_full"; Message is a sentence for people. Field names the
+// request field the message belongs to, so a form can show it under that field.
 type Error struct {
 	Code    Code
 	Reason  string
 	Message string
+	Field   string
 }
 
 func (e *Error) Error() string {
@@ -65,6 +67,11 @@ func Newf(code Code, format string, args ...any) *Error {
 // WithReason returns an *Error that carries a machine-readable reason.
 func WithReason(code Code, reason, message string) *Error {
 	return &Error{Code: code, Reason: reason, Message: message}
+}
+
+// ForField returns an *Error that belongs to one request field.
+func ForField(code Code, field, message string) *Error {
+	return &Error{Code: code, Field: field, Message: message}
 }
 
 // As finds an *Error in err's chain.

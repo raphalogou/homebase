@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"homebase/internal/apperr"
@@ -23,31 +25,53 @@ const (
 	LoginWindow = 10 * time.Minute
 )
 
-// Auth checks passphrases and sessions.
+// Auth checks the account's passphrase and manages sessions.
 type Auth struct {
 	store   store.Store
-	hash    Hash
 	limiter *Limiter
 	now     func() time.Time
 }
 
-// New returns an Auth. hash comes from HOMEBASE_PASSPHRASE_HASH.
-func New(s store.Store, hash Hash, now func() time.Time) *Auth {
-	return &Auth{store: s, hash: hash, limiter: NewLimiter(MaxLogins, LoginWindow, now), now: now}
+// New returns an Auth. The account lives in the database; see Setup and
+// Bootstrap.
+func New(s store.Store, now func() time.Time) *Auth {
+	return &Auth{store: s, limiter: NewLimiter(MaxLogins, LoginWindow, now), now: now}
 }
 
-// Login checks the passphrase and creates a session. It returns the cookie
-// value; only its SHA-256 is stored.
-func (a *Auth) Login(ctx context.Context, passphrase, addr, label string) (string, error) {
+// errNoMatch never says whether the username or the passphrase was wrong.
+var errNoMatch = apperr.ForField(apperr.Unauthorized, "passphrase", "That username or passphrase did not match.")
+
+// Login checks the username and passphrase and creates a session. It
+// returns the cookie value; only its SHA-256 is stored.
+func (a *Auth) Login(ctx context.Context, username, passphrase, addr, label string) (string, error) {
 	if !a.limiter.Allow(addr) {
-		return "", apperr.New(apperr.RateLimited, "Too many attempts. Try again in a few minutes.")
+		return "", errLimited
 	}
-	if !a.hash.Matches(passphrase) {
+	acc, err := a.account(ctx)
+	if errors.Is(err, store.ErrNotFound) {
+		return "", errNoMatch
+	}
+	if err != nil {
+		return "", err
+	}
+	// Both checks always run, so the time taken does not tell a wrong
+	// username from a wrong passphrase.
+	nameOK := subtle.ConstantTimeCompare([]byte(strings.ToLower(strings.TrimSpace(username))), []byte(acc.Username)) == 1
+	passOK, err := matches(acc.PassphraseHash, passphrase)
+	if err != nil {
+		return "", err
+	}
+	if !nameOK || !passOK {
 		a.limiter.Fail(addr)
-		return "", apperr.New(apperr.Unauthorized, "That passphrase is not right.")
+		return "", errNoMatch
 	}
 	a.limiter.Reset(addr)
+	return a.newSession(ctx, label, nil)
+}
 
+// newSession creates a session inside its own transaction, or inside also
+// when it is given, so setup can create the account and the session together.
+func (a *Auth) newSession(ctx context.Context, label string, also func(tx store.Tx) error) (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
@@ -55,6 +79,11 @@ func (a *Auth) Login(ctx context.Context, passphrase, addr, label string) (strin
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	now := a.now().UnixMilli()
 	err := a.store.Tx(ctx, func(tx store.Tx) error {
+		if also != nil {
+			if err := also(tx); err != nil {
+				return err
+			}
+		}
 		return tx.InsertSession(store.Session{TokenHash: hashToken(token), Label: label, CreatedAt: now, LastSeen: now})
 	})
 	if err != nil {

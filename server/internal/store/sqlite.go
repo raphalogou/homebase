@@ -472,6 +472,28 @@ func (t *sqliteTx) LogReview(weekStart string, doneAt int64) error {
 		ON CONFLICT(week_start) DO UPDATE SET done_at = excluded.done_at`, weekStart, doneAt)
 }
 
+// Account
+
+func (t *sqliteTx) Account() (Account, error) {
+	var a Account
+	err := t.row(`SELECT username, passphrase_hash, changed_at FROM account WHERE id = 1`).
+		Scan(&a.Username, &a.PassphraseHash, &a.ChangedAt)
+	return a, notFound(err)
+}
+
+func (t *sqliteTx) InsertAccount(a Account) error {
+	return t.exec(`INSERT INTO account(id, username, passphrase_hash, changed_at) VALUES (1, ?, ?, ?)`,
+		a.Username, a.PassphraseHash, a.ChangedAt)
+}
+
+func (t *sqliteTx) SetUsername(username string) error {
+	return t.exec(`UPDATE account SET username = ? WHERE id = 1`, username)
+}
+
+func (t *sqliteTx) SetPassphraseHash(hash string, changedAt int64) error {
+	return t.exec(`UPDATE account SET passphrase_hash = ?, changed_at = ? WHERE id = 1`, hash, changedAt)
+}
+
 // Sessions
 
 func (t *sqliteTx) Session(tokenHash string) (Session, error) {
@@ -505,6 +527,10 @@ func (t *sqliteTx) SetCalendarToken(token string) error {
 
 func (t *sqliteTx) DeleteSession(tokenHash string) error {
 	return t.exec(`DELETE FROM sessions WHERE token_hash = ?`, tokenHash)
+}
+
+func (t *sqliteTx) DeleteSessionsExcept(keepHash string) error {
+	return t.exec(`DELETE FROM sessions WHERE token_hash <> ?`, keepHash)
 }
 
 // Helpers

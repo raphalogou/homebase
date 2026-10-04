@@ -40,7 +40,7 @@ export function Segmented<T extends string>({
             "h-11 flex-1 rounded-[9px] px-3 text-sm font-semibold text-muted-foreground",
             tone === "ink"
               ? "data-[pressed]:bg-ink data-[pressed]:text-field"
-              : "data-[pressed]:bg-field data-[pressed]:text-ink data-[pressed]:shadow-[0_1px_2px_rgba(20,25,24,.14)]",
+              : "data-[pressed]:bg-field data-[pressed]:text-ink data-[pressed]:shadow-segment",
           )}
         >
           {o.label}

@@ -7,12 +7,14 @@ import { Progress } from "@/components/goal-line";
 import { GoalList } from "@/components/goal-list";
 import { NotesField } from "@/components/notes-field";
 import { ProjectRow } from "@/components/project-row";
-import { Empty, SectionLabel } from "@/components/section";
+import { SectionLabel } from "@/components/section";
+import { DetailSkeleton, ErrorBlock } from "@/components/states";
 import { StatusAndDelete } from "@/components/status-and-delete";
 import { TaskRow } from "@/components/task-row";
 import { TitleField } from "@/components/title-field";
 import { useActions, useGoalProgress, useTasks } from "@/data/hooks";
 import { useGoal, useGoalTasks, useProjectList, useStructureActions } from "@/data/structure";
+import { useFirstLoad } from "@/data/sync-status";
 import { useMedia } from "@/lib/use-media";
 
 export default function GoalScreen() {
@@ -25,6 +27,7 @@ export default function GoalScreen() {
   const actions = useActions();
   const structure = useStructureActions();
   const wide = useMedia("(min-width: 1100px)");
+  const { loading } = useFirstLoad();
 
   if (!goal) {
     return (
@@ -33,7 +36,16 @@ export default function GoalScreen() {
           <>
             <BackLink to="/goals">Goals</BackLink>
             <div className="mt-6">
-              <Empty>This goal is not here. It may have been deleted.</Empty>
+              {loading ? (
+                <DetailSkeleton what="goal" />
+              ) : (
+                <ErrorBlock
+                  title="This goal no longer exists"
+                  action={{ label: "Back to Goals", to: "/goals" }}
+                >
+                  It may have been deleted on another device.
+                </ErrorBlock>
+              )}
             </div>
           </>
         }
@@ -59,6 +71,10 @@ export default function GoalScreen() {
       <p className="mt-1.5 text-[13px] text-muted-foreground">
         {p.total ? `${p.done} of ${p.total} tasks done` : "No tasks yet"}
       </p>
+
+      {goalProjects.length === 0 && own.length === 0 && (
+        <p className="mt-8 text-muted-foreground">No projects or tasks yet.</p>
+      )}
 
       <section aria-labelledby="goal-projects" className="mt-10">
         <SectionLabel id="goal-projects">Projects</SectionLabel>
