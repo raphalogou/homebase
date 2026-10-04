@@ -8,14 +8,15 @@ import (
 	"strings"
 )
 
-// Config is the server configuration. Fields added in later phases (the
-// passphrase hash, VAPID subject) are read here too, so there is one place to
-// look for every variable.
+// Config is the server configuration, read in one place for every variable.
 type Config struct {
 	DataDir      string
 	Addr         string
 	BaseURL      string
 	VAPIDSubject string
+	// PassphraseHash is checked by the serve command, which is the only one
+	// that needs it.
+	PassphraseHash string
 }
 
 // Load reads the configuration through getenv, which is os.Getenv in
@@ -26,6 +27,8 @@ func Load(getenv func(string) string) (Config, error) {
 		Addr:         envOr(getenv, "HOMEBASE_ADDR", ":8080"),
 		BaseURL:      strings.TrimRight(getenv("HOMEBASE_BASE_URL"), "/"),
 		VAPIDSubject: envOr(getenv, "HOMEBASE_VAPID_SUBJECT", "mailto:admin@localhost"),
+		// Not trimmed: a stray space is a broken hash and should fail loudly.
+		PassphraseHash: getenv("HOMEBASE_PASSPHRASE_HASH"),
 	}
 
 	dir, err := filepath.Abs(c.DataDir)

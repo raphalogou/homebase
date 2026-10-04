@@ -17,7 +17,7 @@ Homebase is a personal planner for one person, used on an Android phone and a co
 
 ## Stack (fixed; do not swap)
 
-- **Server:** Go 1.22 or newer, standard library `net/http` with method patterns, `modernc.org/sqlite`, `log/slog`. Extra modules only when unavoidable (`golang.org/x/crypto` for argon2id, optionally a Web Push library). No web framework, no ORM.
+- **Server:** Go 1.26 or newer (required by `modernc.org/sqlite`), standard library `net/http` with method patterns, `modernc.org/sqlite`, `log/slog`. Extra modules only when unavoidable (`golang.org/x/crypto` for argon2id, optionally a Web Push library). No web framework, no ORM.
 - **Web:** React 19, TypeScript with `strict`, React Router (library mode), Tailwind CSS v4, shadcn/ui components, `idb` for IndexedDB, `vite-plugin-pwa` in `injectManifest` mode. Fonts through `@fontsource`.
 - **Tooling:** Vite, Biome for web lint and formatting, the Node built-in test runner (`node --test`) for web unit tests, `gofmt` and `go vet` for Go.
 - **Deploy:** one Go binary that embeds the built web app, one data folder, HTTPS in front (Caddy or Tailscale).
@@ -30,8 +30,8 @@ docs/SPEC.md                  schema, sync, API (source of truth)
 mockups/                      static HTML screens, visual reference only
 server/
   cmd/homebase/main.go
-  internal/{config,db,migrate,store,syncer,recur,api,auth,push,sched,review,ics,files,webui}/
-  migrations/0001_init.sql
+  internal/{config,db,migrate,store,syncer,recur,api,apperr,auth,push,sched,review,ics,files,webui}/
+  migrations/0001_init.sql   embedded by migrations/migrations.go
 web/
   src/{routes,components,components/ui,data,lib,styles}/
   src/sw.ts                   service worker (push, notificationclick, precache)
@@ -103,7 +103,6 @@ A task is done when: the behaviour works offline and online; tests cover the rul
 ## Pitfalls seen in planning
 
 - Web Push works only over HTTPS, and on Android only reliably when the app is installed. Test on a real phone.
-- The plan was written where Go modules could not be downloaded. Phase 0 compiles, but code sketched in `docs/SPEC.md` has never been built; expect small fixes.
 - Google Calendar polls subscribed feeds every several hours. Do not promise instant calendar updates in the UI.
 - Day boundaries use `settings.tz`, not the server's zone and not the browser's at request time.
 - A done task still occupies one of the day's three slots.

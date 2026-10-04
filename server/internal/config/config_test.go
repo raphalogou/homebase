@@ -29,16 +29,18 @@ func TestLoad(t *testing.T) {
 		{
 			name: "all set",
 			env: map[string]string{
-				"HOMEBASE_DATA":          "/srv/homebase",
-				"HOMEBASE_ADDR":          "127.0.0.1:9000",
-				"HOMEBASE_BASE_URL":      "https://home.example.com/",
-				"HOMEBASE_VAPID_SUBJECT": "mailto:me@example.com",
+				"HOMEBASE_DATA":            "/srv/homebase",
+				"HOMEBASE_ADDR":            "127.0.0.1:9000",
+				"HOMEBASE_BASE_URL":        "https://home.example.com/",
+				"HOMEBASE_VAPID_SUBJECT":   "mailto:me@example.com",
+				"HOMEBASE_PASSPHRASE_HASH": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$a2V5",
 			},
 			want: Config{
-				DataDir:      "/srv/homebase",
-				Addr:         "127.0.0.1:9000",
-				BaseURL:      "https://home.example.com",
-				VAPIDSubject: "mailto:me@example.com",
+				DataDir:        "/srv/homebase",
+				Addr:           "127.0.0.1:9000",
+				BaseURL:        "https://home.example.com",
+				VAPIDSubject:   "mailto:me@example.com",
+				PassphraseHash: "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$a2V5",
 			},
 		},
 		{

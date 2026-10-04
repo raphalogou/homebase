@@ -3,22 +3,48 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"homebase/internal/apperr"
+	"homebase/internal/auth"
+	"homebase/internal/syncer"
 )
 
-// New returns the root handler. web serves the built web app for every path
-// that is not an API route.
-func New(log *slog.Logger, web http.Handler) http.Handler {
+// Deps are the services the handlers use.
+type Deps struct {
+	Log  *slog.Logger
+	Auth *auth.Auth
+	Sync *syncer.Syncer
+	// Web serves the built web app for every path that is not an API route.
+	Web http.Handler
+}
+
+type server struct {
+	Deps
+}
+
+// New returns the root handler.
+func New(d Deps) http.Handler {
+	s := &server{Deps: d}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
+
+	mux.Handle("POST /api/login", s.writeChecks(http.HandlerFunc(s.handleLogin)))
+	mux.Handle("POST /api/logout", s.writeChecks(http.HandlerFunc(s.handleLogout)))
+	mux.Handle("GET /api/me", s.session(http.HandlerFunc(s.handleMe)))
+	mux.Handle("GET /api/sync", s.session(http.HandlerFunc(s.handlePull)))
+	mux.Handle("POST /api/sync", s.writeChecks(s.session(http.HandlerFunc(s.handlePush))))
+	mux.Handle("POST /api/promote", s.writeChecks(s.session(http.HandlerFunc(s.handlePromote))))
+
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, log, http.StatusNotFound, "not_found", "No such endpoint.")
+		s.writeError(w, r, apperr.New(apperr.NotFound, "No such endpoint."))
 	})
-	mux.Handle("/", web)
-	return logRequests(log, mux)
+	mux.Handle("/", d.Web)
+	return securityHeaders(logRequests(d.Log, mux))
 }
 
 func handleHealthz(w http.ResponseWriter, _ *http.Request) {
@@ -27,23 +53,88 @@ func handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
+// securityHeaders sets the strict policy of docs/SPEC.md section 7 on every
+// response: only same-origin scripts, styles, fonts and connections.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; object-src 'none'; "+
+			"base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("X-Frame-Options", "DENY")
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			h.Set("Cache-Control", "no-store")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// writeChecks enforces the JSON content type and the X-Homebase header on a
+// state-changing request. A cross-site form cannot set either, which is the
+// CSRF defence on top of SameSite cookies.
+func (s *server) writeChecks(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Homebase") != "1" {
+			s.writeError(w, r, apperr.New(apperr.Invalid, "Missing X-Homebase header."))
+			return
+		}
+		ct, _, _ := strings.Cut(r.Header.Get("Content-Type"), ";")
+		if !strings.EqualFold(strings.TrimSpace(ct), "application/json") {
+			s.writeError(w, r, apperr.New(apperr.Invalid, "Content-Type must be application/json."))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// decode reads a JSON body of at most limit bytes into v.
+func decode(w http.ResponseWriter, r *http.Request, limit int64, v any) error {
+	body := http.MaxBytesReader(w, r.Body, limit)
+	dec := json.NewDecoder(body)
+	if err := dec.Decode(v); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return apperr.New(apperr.TooLarge, "Request body is too large.")
+		}
+		return apperr.New(apperr.Invalid, "Request body is not valid JSON for this endpoint.")
+	}
+	if dec.More() {
+		return apperr.New(apperr.Invalid, "Request body has trailing data.")
+	}
+	return nil
+}
+
+func writeJSON(w http.ResponseWriter, log *slog.Logger, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Warn("write response", "err", err)
+	}
+}
+
 type errorBody struct {
 	Error struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
+		Code    apperr.Code `json:"code"`
+		Message string      `json:"message"`
 	} `json:"error"`
 }
 
-// writeError writes the error shape from docs/SPEC.md section 1.
-func writeError(w http.ResponseWriter, log *slog.Logger, status int, code, message string) {
-	var body errorBody
-	body.Error.Code = code
-	body.Error.Message = message
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(body); err != nil {
-		log.Warn("write error response", "err", err)
+// writeError writes the error shape from docs/SPEC.md section 1. Errors that
+// are not *apperr.Error are logged and hidden behind a generic message.
+func (s *server) writeError(w http.ResponseWriter, r *http.Request, err error) {
+	e, ok := apperr.As(err)
+	if !ok {
+		s.Log.Error("request failed", "method", r.Method, "path", loggedPath(r.URL.Path), "err", err)
+		e = &apperr.Error{Code: "internal", Message: "Something went wrong on the server."}
 	}
+	var body errorBody
+	body.Error.Code = e.Code
+	body.Error.Message = e.Message
+	if e.Code == apperr.RateLimited {
+		w.Header().Set("Retry-After", "600")
+	}
+	writeJSON(w, s.Log, e.Code.Status(), body)
 }
 
 type statusRecorder struct {

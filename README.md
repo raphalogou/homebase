@@ -32,9 +32,12 @@ A calm personal planner for goals, projects and tasks, built to be opened every 
 
 ## Quick start
 
-Requires Go 1.22 or newer, Node 22.18 or newer, and `make`.
+Requires Go 1.26 or newer, Node 22.18 or newer, and `make`.
 
 ```sh
+# once: store a passphrase hash for development in .env (never committed)
+(cd server && go run ./cmd/homebase hash-passphrase) >> .env
+
 # development: Go server and Vite dev server together, open http://localhost:5173
 make dev
 

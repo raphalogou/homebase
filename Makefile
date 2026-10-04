@@ -20,8 +20,15 @@ web/node_modules: web/package.json web/package-lock.json
 	@touch $@
 
 # Both processes share the shell's process group, so Ctrl-C stops both.
+# A .env file (never committed) can hold HOMEBASE_PASSPHRASE_HASH.
 dev: web/node_modules
-	@trap 'trap - INT TERM EXIT; kill 0' INT TERM EXIT; \
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$${HOMEBASE_PASSPHRASE_HASH:-}" ]; then \
+		echo "HOMEBASE_PASSPHRASE_HASH is not set. Create it with:"; \
+		echo "  (cd server && go run ./cmd/homebase hash-passphrase) >> .env"; \
+		exit 1; \
+	fi; \
+	trap 'trap - INT TERM EXIT; kill 0' INT TERM EXIT; \
 	(cd server && \
 		HOMEBASE_DATA="$${HOMEBASE_DATA:-$(CURDIR)/data}" \
 		HOMEBASE_ADDR="$${HOMEBASE_ADDR:-127.0.0.1:8080}" \

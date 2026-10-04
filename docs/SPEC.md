@@ -174,6 +174,16 @@ Revision-based: every change gets a number, and a device asks for everything new
 | Client clock far ahead | An `updatedAt` more than 5 minutes in the future is clamped to server time. |
 | Plan a fourth task for one day | Rejected with `invalid`, reason `day_full`. |
 
+### Details
+
+- **Row shape.** Rows travel as JSON with camelCase names for the columns (`goalId`, `plannedOn`, `planRank`, `doneAt`, `updatedAt`, `deletedAt`, `fileSha`, `atLocal`, ...). Nullable columns are always present, as `null` when empty. The same shape is used in pulls, in op rows and in `changes`.
+- **Revisions.** Every row write takes its own `meta.rev` value, so revisions are unique. A pull page holds the `limit` rows with the lowest revisions; with `more:true`, `rev` is the revision of the last row in the page, otherwise it is `meta.rev`. First-run setup gives each seeded reminder a revision so that a first pull returns them.
+- **Op rows.** An upsert replaces the whole row. `id` in the row may be left out but must match the op's `id` if present. Server-owned fields (`rev`, `slipped`, `createdAt` of an existing row, `deletedAt`) are ignored. `doneAt` is kept if the client sends a sensible one, filled with the op's time otherwise, and cleared when the status is not `done`.
+- **Ties.** An op whose `updatedAt` equals the stored row's is treated as already applied (a re-push), not as a conflict.
+- **Rejections.** `rejected[].reason` is `invalid` (validation or a missing parent row), `stale` (the server has a newer version), or `day_full`. For every rejected op, `changes` also includes the server's current copy of that row, if it exists, even when its `rev` is not above `base`, so the client can undo its optimistic change.
+- **Deletes.** Deleting a row the server never saw, or one already deleted, is applied as a no-op. Deleting a task also tombstones its attachments. A goal or project delete without `cascade` detaches. Rows touched by a cascade keep the later of their own `updatedAt` and the delete's.
+- **Limits.** At most 1000 ops per push (`too_large` otherwise). Pull `limit` defaults to 500, maximum 1000.
+
 ## 4. API
 
 JSON over HTTPS with a session cookie. Every state-changing request needs `Content-Type: application/json` (multipart for upload) and the header `X-Homebase: 1`.
@@ -185,7 +195,7 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 | `GET /api/me` | none | `{tz, weekStart, rev}` |
 | `GET /api/sync?since=N&limit=500` | none | `{rev, more, goals[], projects[], tasks[], repeats[], attachments[], reminders[]}` |
 | `POST /api/sync` | `{base, ops[]}` | `{rev, applied[], rejected[{id,reason}], changes}` |
-| `POST /api/promote` | `{taskId, goalId?}` | `{project, removedTaskId}`. One transaction: new project from an Inbox task, notes and attachments moved, task tombstoned. |
+| `POST /api/promote` | `{taskId, goalId?}` | `{project, removedTaskId}`. One transaction: new project from an Inbox task, notes and attachments moved, task tombstoned. The project takes the task's title, notes and `due`; without `goalId` it keeps the task's goal. A task already in a project is `invalid`. |
 | `GET /api/review` | none | `{weekStart, doneCount, doneByGoal[], quiet[{kind,id,title,lastActivity}], goalsWithNothing[]}` |
 | `POST /api/review/complete` | `{weekStart, decisions[{kind,id,action}]}`, action is `keep`, `pause` or `drop` | `{rev}`. Applies decisions, writes `review_log`. |
 | `POST /api/files` | multipart: `file`, `ownerKind`, `ownerId`, optional `name` | The new `attachments` row. Stored by SHA-256. |
@@ -206,9 +216,9 @@ Links and notes are ordinary attachment rows written through `/api/sync`. Removi
 
 All of these live on the server so every device sees the same result.
 
-- **Today's three.** At most 3 tasks per `planned_on` date, counting done ones. Applies to future days too.
+- **Today's three.** At most 3 tasks per `planned_on` date, counting done ones. Applies to future days too. Dropped and deleted tasks do not count.
 - **Inbox.** An open, live task with no project, no goal, no `due` and no `planned_on`.
-- **Daily rollover.** At 00:05 in `settings.tz`, and on the first sync of a new day if missed. Every open task with `planned_on` before today gets `planned_on` and `plan_rank` cleared and `slipped` increased by 1. Nothing turns red.
+- **Daily rollover.** At 00:05 in `settings.tz`, and on the first sync of a new day if missed. Every open task with `planned_on` before today gets `planned_on` and `plan_rank` cleared and `slipped` increased by 1. Nothing turns red. The rollover bumps `rev` but leaves `updated_at` alone, so an edit made offline before midnight (ticking the task done at 23:59) still wins when it arrives. An open task pushed with a `planned_on` before today has its plan cleared on arrival; `slipped` is not increased again.
 - **Reconsider pile.** Open tasks with `slipped >= 2`, shown as "Moved a few times". Completing or dropping a task ends the count.
 - **Overdue.** A past `due` stays visible as text such as "2d overdue". Only `planned_on` rolls over, never `due`.
 - **Goal progress.** Done tasks divided by all non-dropped tasks, counted from the goal's projects and from tasks directly under it.
@@ -217,7 +227,8 @@ All of these live on the server so every device sees the same result.
 
 - A repeating task is one row with a `repeat_id`. Completing or dropping it creates the successor. Dropping counts as skipping this time.
 - `after_done`: next `due` is the completion date plus `every` days, weeks or months. Right for chores.
-- `fixed`: next `due` is the next date after the old `due` matching the rule (weekday mask or day of month).
+- `fixed`: next `due` is the next date after the old `due` matching the rule (weekday mask or day of month). Without an old `due`, the completion day is used. With a weekday mask and `every` above 1, weeks run Monday to Sunday and only every N-th week from the old `due`'s week counts.
+- **Month ends.** Adding months clamps to the end of a shorter month (31 January plus one month is 28 or 29 February). For `fixed`, a `due` on the last day of its month stays on the last day (28 February, then 31 March). A `due` on the 29th or 30th clamps in February and then follows the last day. The completion day is the local day of `done_at` in `settings.tz`.
 - The successor copies title, notes, project or goal and `repeat_id`. It does not copy attachments, `planned_on` or `slipped`.
 - Never more than one open instance per `repeat_id`. An `until` in the past stops the chain.
 
@@ -260,6 +271,10 @@ All of these live on the server so every device sees the same result.
 - One passphrase, stored only as an argon2id hash in configuration.
 - Session token: 32 random bytes in an HttpOnly, Secure, SameSite=Lax cookie. The database stores only its SHA-256.
 - The `X-Homebase` header and JSON content type on every write. Strict Content Security Policy, no third-party scripts, self-hosted fonts.
+- Every response carries `Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`. API responses are `Cache-Control: no-store`.
+- Sessions slide: `last_seen` moves at most once an hour, and the cookie is sent again when it does. A session unused for 180 days is deleted.
+- The login limit counts per client address. `X-Forwarded-For` is trusted only when the peer is loopback (Caddy or Tailscale on the same machine), and only its last entry.
+- Request logs never include query strings, and `/calendar/` paths are logged redacted.
 - Backups: `homebase backup <dir>` runs `VACUUM INTO` and copies the files folder.
 
 ## 8. Defaults chosen for open decisions

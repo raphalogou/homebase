@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phase 0 done.
+Status: Phases 0 and 1 done.
 
 ## Decisions already made
 
@@ -35,18 +35,27 @@ Notes:
 
 ## Phase 1: foundation (server)
 
-- [ ] Migration runner reading `server/migrations/*.sql` in order, recording `schema_migrations`. `0001_init.sql` copied exactly from `docs/SPEC.md` section 2.
-- [ ] `store` package behind an interface, so tests can use an in-memory SQLite database. No ORM.
-- [ ] First-run setup: create the `settings` row with a random calendar token; generate VAPID keys into the data folder.
-- [ ] Auth: argon2id passphrase check, session cookie, login rate limit, `X-Homebase` header check, `GET /api/me`, logout.
-- [ ] `GET` and `POST /api/sync` per section 3, including cascade deletes, the 5-minute clock clamp, the `day_full` rule, and server-owned fields.
-- [ ] Recurrence in the apply step (section 5).
-- [ ] Daily rollover job, run at 00:05 and on the first sync of a new day.
-- [ ] `POST /api/promote`.
+- [x] Migration runner reading `server/migrations/*.sql` in order, recording `schema_migrations`. `0001_init.sql` copied exactly from `docs/SPEC.md` section 2.
+- [x] `store` package behind an interface, so tests can use an in-memory SQLite database. No ORM.
+- [x] First-run setup: create the `settings` row with a random calendar token; generate VAPID keys into the data folder.
+- [x] Auth: argon2id passphrase check, session cookie, login rate limit, `X-Homebase` header check, `GET /api/me`, logout.
+- [x] `GET` and `POST /api/sync` per section 3, including cascade deletes, the 5-minute clock clamp, the `day_full` rule, and server-owned fields.
+- [x] Recurrence in the apply step (section 5).
+- [x] Daily rollover job, run at 00:05 and on the first sync of a new day.
+- [x] `POST /api/promote`.
 
 **Tests required** (table-driven, in-memory DB): conflict resolution both directions; delete versus edit; cascade delete and detach; fourth task on a day; repeat spawn for `fixed` and `after_done`, including month ends; rollover increments `slipped` and clears the plan; promote moves attachments; idempotent re-push of the same ops.
 
 **Done when:** a script that pushes ops from two simulated devices converges to the same state on both, and all tests pass.
+
+Notes:
+
+- The "two devices converge" check is `TestTwoDevicesConverge` in `internal/syncer`: two simulated clients with their own copies and outboxes edit offline, sync in turn, and end up identical to the server. A manual run against the built binary (login, push, the day limit, a repeat successor, paging, promote, logout) also passed.
+- Gaps in the spec were filled and written into `docs/SPEC.md` (section 3 "Details", sections 5 and 7). The ones worth a look: dropped tasks do not count toward the three; a delete without `cascade` detaches; the rollover does not touch `updated_at`, so a task ticked done offline at 23:59 is not lost; and rejected ops return the server's copy in `changes`.
+- The current `modernc.org/sqlite` and `golang.org/x/crypto` declare `go 1.26.0`, so `go.mod` and the docs now ask for Go 1.26. One database connection serialises all writes, which keeps revisions in commit order.
+- Typed errors live in `internal/apperr`; migrations are embedded from `server/migrations` by a small Go file there. `internal/push` only creates the VAPID key so far; `internal/sched` only runs the rollover.
+- `homebase hash-passphrase` turns off echo with `stty` rather than adding `golang.org/x/term`.
+- Not done, because Phase 1 did not list it: purging tombstones after 90 days.
 
 ## Phase 2: daily loop (web)
 
