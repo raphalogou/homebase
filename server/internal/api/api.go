@@ -27,6 +27,8 @@ type Deps struct {
 	// Keys and Sender are for Web Push.
 	Keys   push.Keys
 	Sender sched.Sender
+	// BaseURL is HOMEBASE_BASE_URL; empty means "the address requests come to".
+	BaseURL string
 	// Web serves the built web app for every path that is not an API route.
 	Web http.Handler
 }
@@ -57,6 +59,12 @@ func New(d Deps) http.Handler {
 	mux.Handle("PUT /api/reminders", s.writeChecks(s.session(http.HandlerFunc(s.handleSaveReminders))))
 	mux.Handle("GET /api/settings", s.session(http.HandlerFunc(s.handleGetSettings)))
 	mux.Handle("PUT /api/settings", s.writeChecks(s.session(http.HandlerFunc(s.handlePutSettings))))
+	mux.Handle("GET /api/review", s.session(http.HandlerFunc(s.handleReview)))
+	mux.Handle("POST /api/review/complete", s.writeChecks(s.session(http.HandlerFunc(s.handleCompleteReview))))
+	mux.Handle("POST /api/calendar/rotate", s.writeChecks(s.session(http.HandlerFunc(s.handleRotateCalendar))))
+	mux.Handle("GET /api/sessions", s.session(http.HandlerFunc(s.handleSessions)))
+	mux.Handle("POST /api/sessions/revoke", s.writeChecks(s.session(http.HandlerFunc(s.handleRevokeSession))))
+	mux.HandleFunc("GET /calendar/{file}", s.handleCalendar)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, apperr.New(apperr.NotFound, "No such endpoint."))

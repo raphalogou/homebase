@@ -11,6 +11,10 @@ import type {
   PushResult,
   Reminder,
   ReminderInput,
+  ReviewAction,
+  ReviewSummary,
+  ServerSettings,
+  SessionInfo,
 } from "./types.ts";
 
 /** An error answer from the server, with the code from docs/SPEC.md. */
@@ -135,6 +139,15 @@ export const api = {
   devices: () => request<Device[]>("GET", "/api/push/subscriptions"),
   pushTest: () => request<{ sent: number; failed: number }>("POST", "/api/push/test"),
   saveReminders: (list: ReminderInput[]) => request<Reminder[]>("PUT", "/api/reminders", list),
+  review: () => request<ReviewSummary>("GET", "/api/review"),
+  completeReview: (
+    weekStart: string,
+    decisions: { kind: "project" | "goal"; id: string; action: ReviewAction }[],
+  ) => request<{ rev: number }>("POST", "/api/review/complete", { weekStart, decisions }),
+  settings: () => request<ServerSettings>("GET", "/api/settings"),
+  rotateCalendar: () => request<{ url: string }>("POST", "/api/calendar/rotate"),
+  sessions: () => request<SessionInfo[]>("GET", "/api/sessions"),
+  revokeSession: (id: string) => request<void>("POST", "/api/sessions/revoke", { id }),
   putSettings: (tz: string, weekStart: 0 | 1) =>
     request<{ tz: string; weekStart: 0 | 1 }>("PUT", "/api/settings", { tz, weekStart }),
   promote: (taskId: string, goalId: string | null) =>

@@ -196,11 +196,13 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 | `GET /api/sync?since=N&limit=500` | none | `{rev, more, goals[], projects[], tasks[], repeats[], attachments[], reminders[]}` |
 | `POST /api/sync` | `{base, ops[]}` | `{rev, applied[], rejected[{id,reason}], changes}` |
 | `POST /api/promote` | `{taskId, goalId?}` | `{project, removedTaskId}`. One transaction: new project from an Inbox task, notes and attachments moved, task tombstoned. The project takes the task's title, notes and `due`; without `goalId` it keeps the task's goal. A task already in a project is `invalid`. |
-| `GET /api/review` | none | `{weekStart, doneCount, doneByGoal[], quiet[{kind,id,title,lastActivity}], goalsWithNothing[]}` |
+| `GET /api/review` | none | `{weekStart, doneCount, doneByGoal[], quiet[{kind,id,title,lastActivity}], goalsWithNothing[], completed}`. `completed` says whether this week's review was finished, for the link on Today. |
 | `POST /api/review/complete` | `{weekStart, decisions[{kind,id,action}]}`, action is `keep`, `pause` or `drop` | `{rev}`. Applies decisions, writes `review_log`. |
 | `POST /api/files` | multipart: `file`, `ownerKind`, `ownerId`, optional `name` | The new `attachments` row. Stored by SHA-256. |
 | `GET /api/files/{sha}` | none | The file. Images and PDFs inline, others as download. Always `X-Content-Type-Options: nosniff`. |
-| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart}` | The settings. `tz` must be a valid IANA name (`Local` is refused); `weekStart` is 0 or 1. |
+| `GET /api/settings`, `PUT /api/settings` | `{tz, weekStart}` | The settings. `tz` must be a valid IANA name (`Local` is refused); `weekStart` is 0 or 1. `GET` also returns `calendarUrl`, built from `HOMEBASE_BASE_URL` or, without it, the address the request came to. |
+| `GET /api/sessions` | none | `[{id, label, createdAt, lastSeen, current}]`. `id` is the first 16 hex characters of the stored hash; neither the token nor the full hash is sent. Sessions unused for 180 days are left out. |
+| `POST /api/sessions/revoke` | `{id}` | 204. Logs that session out; ending one that is not there is fine. This device uses `/api/logout`. |
 | `PUT /api/reminders` | `[{slot, enabled, atLocal, kind}]`, at most 3 | The saved rows |
 | `GET /api/push/key` | none | `{publicKey}` (VAPID, base64url) |
 | `POST /api/push/subscribe` | `{endpoint, keys:{p256dh, auth}, label}` | 204 |
@@ -235,7 +237,7 @@ All of these live on the server so every device sees the same result.
 
 ### Weekly review
 
-- **Quiet:** an open project with open tasks and no task created, updated or done and no edit to the project itself in 21 days, or an open goal with no planned or done task and no edit in 21 days.
+- **Quiet:** an open project with open tasks and no task created, updated or done and no edit to the project itself in 21 days, or an open goal with no planned or done task and no edit in 21 days. For a goal, its tasks count directly and through its projects; a task counts as planned when its `planned_on` is within the last 21 days or ahead. Merely editing a goal's task does not wake the goal.
 - **Surfacing:** Today shows a review link from Friday until it is completed. The review is available any time.
 - **Decisions:** `keep` touches the row's `updated_at`, which resets the quiet clock. `pause` sets `paused`, `drop` sets `dropped`. Nothing is deleted.
 
@@ -246,7 +248,7 @@ All of these live on the server so every device sees the same result.
 - **Scheduler.** A 30-second ticker checks each enabled slot against local time in `settings.tz`. A slot fires when local time is at or past `at_local` and less than 90 minutes later, and no `reminder_log` row exists for that slot and day. Insert the log row first; its primary key prevents a double send.
 - **Down for a while.** If the server was off for more than 90 minutes past a slot, skip it for the day.
 - **Delivery.** Web Push with VAPID keys generated at first run and kept in the data folder. Payloads encrypted `aes128gcm` (RFC 8291), VAPID JWT per RFC 8292. A 404 or 410 deletes the subscription.
-- **Time zone.** One zone for all devices, taken from the browser when the user opens Reminders.
+- **Time zone.** One zone for all devices. Opening Reminders takes it from the browser while it is still the first-run `UTC`; after that it changes in Settings, so a choice made there sticks.
 - **Details.** The scheduler ticks every 30 seconds. Push messages carry `{title, body, url, tag, sync}`, with `tag` = `reminder-<slot>` so a newer one replaces an unread one, and `sync: true` so an open window syncs. TTL is one hour, after which a reminder is stale. Send errors are logged by device label, never by endpoint. `PUT /api/reminders` stamps a revision on each saved slot, so other devices get the change through sync. A focus title rotates through the open goals by the number of days since 1970-01-01.
 - **Cases the table does not cover.** Focus with every planned task done: "All done for today." Check-in with nothing planned: "Nothing planned yet. Choose your three for today." Check-in or wrap with everything done: "All done for today." Focus with no goals: title "Today".
 
@@ -271,6 +273,7 @@ All of these live on the server so every device sees the same result.
 - Stable UIDs (`task-<id>-due@homebase`), `DTSTAMP` from `updated_at`, `REFRESH-INTERVAL` and `X-PUBLISHED-TTL` of one hour, `ETag` and `If-None-Match` supported.
 - The URL secret is 32 random bytes. Rotating invalidates the old link.
 - Google Calendar polls subscribed feeds only every several hours, so changes appear slowly. Anyone with the link can read task titles.
+- Events are `TRANSP:TRANSPARENT` so they do not block time. Lines are folded at 75 octets and text is escaped as RFC 5545 asks. The token is compared in constant time, and request logs show the path as `/calendar/[redacted]`.
 
 ## 7. Security
 
@@ -281,7 +284,7 @@ All of these live on the server so every device sees the same result.
 - Sessions slide: `last_seen` moves at most once an hour, and the cookie is sent again when it does. A session unused for 180 days is deleted.
 - The login limit counts per client address. `X-Forwarded-For` is trusted only when the peer is loopback (Caddy or Tailscale on the same machine), and only its last entry.
 - Request logs never include query strings, and `/calendar/` paths are logged redacted.
-- Backups: `homebase backup <dir>` runs `VACUUM INTO` and copies the files folder.
+- Backups: `homebase backup <dir>` runs `VACUUM INTO` into `<dir>/homebase-YYYYMMDD-HHMMSS.db`, copies stored files missing from `<dir>/files`, and copies the VAPID key, without which every device would have to turn reminders on again. It is safe while the server runs.
 
 ## 8. Defaults chosen for open decisions
 

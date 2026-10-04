@@ -89,8 +89,13 @@ type Tx interface {
 	// a row already exists, which is what stops a second send.
 	LogReminder(slot int, localDate string, sentAt int64) (bool, error)
 
+	ReviewDone(weekStart string) (bool, error)
+	LogReview(weekStart string, doneAt int64) error
+
 	Session(tokenHash string) (Session, error)
 	InsertSession(Session) error
 	TouchSession(tokenHash string, lastSeen int64) error
+	Sessions() ([]Session, error)
+	SetCalendarToken(token string) error
 	DeleteSession(tokenHash string) error
 }

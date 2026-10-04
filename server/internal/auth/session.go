@@ -115,3 +115,55 @@ func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
+
+// SessionInfo is one session as Settings shows it. ID is the start of the
+// stored hash: enough to name it, and nothing that could log anyone in.
+type SessionInfo struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	CreatedAt int64  `json:"createdAt"`
+	LastSeen  int64  `json:"lastSeen"`
+	Current   bool   `json:"current"`
+}
+
+func sessionID(tokenHash string) string { return tokenHash[:16] }
+
+// Sessions lists the live sessions, marking the one making the request.
+func (a *Auth) Sessions(ctx context.Context, currentToken string) ([]SessionInfo, error) {
+	current := hashToken(currentToken)
+	cutoff := a.now().Add(-SessionLifetime).UnixMilli()
+	out := []SessionInfo{}
+	err := a.store.Tx(ctx, func(tx store.Tx) error {
+		list, err := tx.Sessions()
+		for _, s := range list {
+			if s.LastSeen < cutoff {
+				continue
+			}
+			out = append(out, SessionInfo{
+				ID: sessionID(s.TokenHash), Label: s.Label, CreatedAt: s.CreatedAt, LastSeen: s.LastSeen,
+				Current: s.TokenHash == current,
+			})
+		}
+		return err
+	})
+	return out, err
+}
+
+// Revoke ends the session with this id. Ending one that is not there is fine.
+func (a *Auth) Revoke(ctx context.Context, id string) error {
+	if len(id) != 16 {
+		return apperr.New(apperr.Invalid, "id must be a session id.")
+	}
+	return a.store.Tx(ctx, func(tx store.Tx) error {
+		list, err := tx.Sessions()
+		if err != nil {
+			return err
+		}
+		for _, s := range list {
+			if sessionID(s.TokenHash) == id {
+				return tx.DeleteSession(s.TokenHash)
+			}
+		}
+		return nil
+	})
+}

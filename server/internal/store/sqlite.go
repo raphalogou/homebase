@@ -461,6 +461,17 @@ func (t *sqliteTx) LogReminder(slot int, localDate string, sentAt int64) (bool, 
 	return n == 1, err
 }
 
+func (t *sqliteTx) ReviewDone(weekStart string) (bool, error) {
+	var n int
+	err := t.row(`SELECT count(*) FROM review_log WHERE week_start = ?`, weekStart).Scan(&n)
+	return n > 0, err
+}
+
+func (t *sqliteTx) LogReview(weekStart string, doneAt int64) error {
+	return t.exec(`INSERT INTO review_log(week_start, done_at) VALUES (?, ?)
+		ON CONFLICT(week_start) DO UPDATE SET done_at = excluded.done_at`, weekStart, doneAt)
+}
+
 // Sessions
 
 func (t *sqliteTx) Session(tokenHash string) (Session, error) {
@@ -477,6 +488,19 @@ func (t *sqliteTx) InsertSession(s Session) error {
 
 func (t *sqliteTx) TouchSession(tokenHash string, lastSeen int64) error {
 	return t.exec(`UPDATE sessions SET last_seen = ? WHERE token_hash = ?`, lastSeen, tokenHash)
+}
+
+func (t *sqliteTx) Sessions() ([]Session, error) {
+	return queryAll(t, `SELECT token_hash, label, created_at, last_seen FROM sessions ORDER BY last_seen DESC`,
+		func(sc interface{ Scan(...any) error }) (Session, error) {
+			var s Session
+			err := sc.Scan(&s.TokenHash, &s.Label, &s.CreatedAt, &s.LastSeen)
+			return s, err
+		})
+}
+
+func (t *sqliteTx) SetCalendarToken(token string) error {
+	return t.exec(`UPDATE settings SET calendar_token = ? WHERE id = 1`, token)
 }
 
 func (t *sqliteTx) DeleteSession(tokenHash string) error {

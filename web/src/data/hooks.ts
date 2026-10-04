@@ -246,7 +246,13 @@ export function useActions() {
         }
       },
 
-      async setRepeat(id: string, repeat: Pick<Repeat, "freq" | "every" | "mode"> | null) {
+      /** Sets the task's repeat rule; fields left out keep their value (or none). */
+      async setRepeat(
+        id: string,
+        repeat:
+          | (Pick<Repeat, "freq" | "every" | "mode"> & Partial<Pick<Repeat, "weekdays" | "until">>)
+          | null,
+      ) {
         const t = get(id);
         const now = Date.now();
         if (!repeat) {
@@ -259,8 +265,8 @@ export function useActions() {
         const repeatId = existing?.id ?? ulid(now);
         await store.put("repeats", {
           id: repeatId,
-          weekdays: null,
-          until: null,
+          weekdays: existing?.weekdays ?? null,
+          until: existing?.until ?? null,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
           deletedAt: null,

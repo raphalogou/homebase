@@ -189,3 +189,45 @@ func TestLoginRateLimit(t *testing.T) {
 		t.Fatalf("other address: %v", err)
 	}
 }
+
+func TestSessionsListAndRevoke(t *testing.T) {
+	f := newFixture(t, testHash(t))
+	phone, err := f.auth.Login(f.ctx, pass, "1.1.1.1", "Chrome on Android")
+	if err != nil {
+		t.Fatal(err)
+	}
+	laptop, err := f.auth.Login(f.ctx, pass, "2.2.2.2", "Firefox on Linux")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := f.auth.Sessions(f.ctx, phone)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("sessions = %+v, %v", list, err)
+	}
+	var other SessionInfo
+	for _, s := range list {
+		if s.Current != (s.Label == "Chrome on Android") {
+			t.Errorf("current wrong for %+v", s)
+		}
+		if strings.Contains(phone, s.ID) || strings.Contains(laptop, s.ID) {
+			t.Error("session id reveals the token")
+		}
+		if !s.Current {
+			other = s
+		}
+	}
+
+	if err := f.auth.Revoke(f.ctx, other.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.auth.Check(f.ctx, laptop); code(err) != apperr.Unauthorized {
+		t.Errorf("revoked laptop still works: %v", err)
+	}
+	if _, err := f.auth.Check(f.ctx, phone); err != nil {
+		t.Errorf("phone was logged out too: %v", err)
+	}
+	if err := f.auth.Revoke(f.ctx, "short"); code(err) != apperr.Invalid {
+		t.Errorf("bad id: %v", err)
+	}
+}

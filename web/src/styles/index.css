@@ -26,6 +26,8 @@
   --soft-day: #e0e3dc;
   --dashed: #aeb3ac;
   --highlight: #f2e94e;
+  /* Only for a refused login: a muted rust, 6.3:1 on --bg. */
+  --danger: #9a3b12;
   --notif-bg: #1b1c1f;
   --notif-card: #2e3034;
 
@@ -48,6 +50,7 @@
   --color-soft-day: var(--soft-day);
   --color-dashed: var(--dashed);
   --color-highlight: var(--highlight);
+  --color-danger: var(--danger);
   --color-notif-bg: var(--notif-bg);
   --color-notif-card: var(--notif-card);
 

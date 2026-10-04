@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 to 3 done; Phase 4 built, waiting for a test on a real phone.
+Status: Phases 0 to 5 done; Phase 4's reminders still need a test on a real phone over HTTPS.
 
 ## Decisions already made
 
@@ -128,14 +128,24 @@ Notes:
 
 ## Phase 5: finish
 
-- [ ] Recurrence UI (repeat picker: every N days, weeks, months; fixed or after done; end date).
-- [ ] Weekly review (`/api/review`, `/api/review/complete`), phone and desktop.
-- [ ] Calendar feed and rotate button.
-- [ ] `homebase backup <dir>` command and restore note in the README.
-- [ ] Deploy files in `deploy/`: Dockerfile, Caddyfile, systemd unit.
-- [ ] Settings screen: time zone, week start, calendar link, sessions list.
+- [x] Recurrence UI (repeat picker: every N days, weeks, months; fixed or after done; end date).
+- [x] Weekly review (`/api/review`, `/api/review/complete`), phone and desktop.
+- [x] Calendar feed and rotate button.
+- [x] `homebase backup <dir>` command and restore note in the README.
+- [x] Deploy files in `deploy/`: Dockerfile, Caddyfile, systemd unit.
+- [x] Settings screen: time zone, week start, calendar link, sessions list.
 
 **Done when:** a fresh install on a clean server follows the README top to bottom and works.
+
+Notes:
+
+- **Done when, checked:** the README's Docker steps were followed as written on this machine, changing only the names (`homebase-test`) and the port. Build the image, write the settings file with `hash-passphrase`, start it, check `/healthz`, log in. Then the backup steps (recreate with the folder mounted, `docker exec … homebase backup`) and the restore (stop, copy the backup over the database, start), which brought back the state of the backup. The runtime image is `busybox:musl` (owner's choice over distroless and Alpine): 22.6 MB, with `sh`, `stty` and `wget`, and the CA bundle copied from the build stage. Not followed: the systemd path (needs root on a server) and HTTPS with Caddy or Tailscale (needs a domain).
+- Found while installing: Docker's `--env-file` keeps the single quotes that `hash-passphrase` prints (systemd and shells strip them). The server now removes one pair of matching quotes, so both work.
+- Approved and added to the spec: `GET /api/sessions` and `POST /api/sessions/revoke`. Small additions the approved screens need: `completed` in the review and `calendarUrl` in the settings.
+- Changed rule: opening Reminders adopts the browser's zone only while it is still the first-run UTC, so a zone chosen in Settings sticks.
+- Verified in headless Chromium against the Docker install: the review link on Today (a Sunday, with Monday weeks), the review with a quiet project and goal, pausing the goal (it left Today's goals) and the link gone after "Finish review"; the repeat picker ("Every week on Monday and Thursday, from the due date."); Settings with the calendar link, a new link replacing it, and the sessions list; the rail order.
+- The quick "Repeat" select stays in Plan's "New task" form; the full picker is in the task sheet and panel.
+- Backups keep every database copy; pruning old ones is left to the owner (the README says so).
 
 ## Phase 6: polish (not designed yet)
 
@@ -144,7 +154,7 @@ These were never drawn. Design them in the same style as `DESIGN.md` and show th
 - [ ] Dark theme (tokens are proposed in `DESIGN.md`; check contrast).
 - [ ] Empty, loading and error states for every screen.
 - [ ] Offline and sync-failed indicator.
-- [ ] Phone Projects list, goal creation, and the repeat picker. (Phone Projects list and goal creation done in Phase 3.)
+- [x] Phone Projects list, goal creation, and the repeat picker. (Done in Phases 3 and 5.)
 - [ ] Keyboard shortcuts on desktop (capture, switch screens).
 - [ ] Accessibility pass: focus order, screen reader labels, reduced motion.
 

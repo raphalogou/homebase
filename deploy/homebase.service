@@ -1,0 +1,46 @@
+# /etc/systemd/system/homebase.service
+# The passphrase hash goes in /etc/homebase/env (mode 600), for example:
+#   HOMEBASE_PASSPHRASE_HASH='$argon2id$v=19$...'
+#   HOMEBASE_BASE_URL=https://homebase.example.com
+#   HOMEBASE_VAPID_SUBJECT=mailto:you@example.com
+
+[Unit]
+Description=Homebase planner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=homebase
+Group=homebase
+EnvironmentFile=/etc/homebase/env
+Environment=HOMEBASE_DATA=/var/lib/homebase
+Environment=HOMEBASE_ADDR=127.0.0.1:8080
+ExecStart=/usr/local/bin/homebase serve
+Restart=on-failure
+RestartSec=5s
+StateDirectory=homebase
+StateDirectoryMode=0700
+UMask=0077
+
+# Nothing here needs more than its own data folder and the network.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -37,6 +37,7 @@ const usage = `Usage: homebase <command>
 Commands:
   serve              run the server
   hash-passphrase    read a passphrase and print HOMEBASE_PASSPHRASE_HASH
+  backup <dir>       copy the database, files and push key into dir
 `
 
 func main() {
@@ -63,6 +64,16 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 		return serve(ctx, cfg, log)
 	case "hash-passphrase":
 		return hashPassphrase(stdin, stdout, stderr)
+	case "backup":
+		if len(args) != 2 {
+			_, _ = fmt.Fprint(stderr, usage)
+			return errors.New("backup needs a folder: homebase backup <dir>")
+		}
+		cfg, err := config.Load(getenv)
+		if err != nil {
+			return err
+		}
+		return backup(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stderr, usage)
 		return nil
@@ -111,13 +122,14 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.New(api.Deps{
-			Log:    log,
-			Auth:   auth.New(st, hash, time.Now),
-			Sync:   sy,
-			Blobs:  blobs,
-			Keys:   keys,
-			Sender: sender,
-			Web:    webui.Handler(),
+			Log:     log,
+			Auth:    auth.New(st, hash, time.Now),
+			Sync:    sy,
+			Blobs:   blobs,
+			Keys:    keys,
+			Sender:  sender,
+			BaseURL: cfg.BaseURL,
+			Web:     webui.Handler(),
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Generous enough for a 25 MB upload on a slow phone connection.

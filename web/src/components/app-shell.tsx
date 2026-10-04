@@ -4,7 +4,15 @@ import { useInbox, useTask } from "@/data/hooks";
 import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
-import { GoalsIcon, InboxIcon, PlanIcon, RemindersIcon, TodayIcon } from "./icons";
+import {
+  GoalsIcon,
+  InboxIcon,
+  PlanIcon,
+  RemindersIcon,
+  ReviewIcon,
+  SettingsIcon,
+  TodayIcon,
+} from "./icons";
 import { PickDialog } from "./pick-dialog";
 import { TaskPanel, TaskSheet } from "./task-editor";
 import { Toaster } from "./toaster";
@@ -15,13 +23,15 @@ interface NavItem {
   icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 }
 
-// Weekly review and Reminders join the rail when their phases land.
 const NAV: NavItem[] = [
   { to: "/", label: "Today", icon: TodayIcon },
   { to: "/inbox", label: "Inbox", icon: InboxIcon },
   { to: "/plan", label: "Plan", icon: PlanIcon },
   { to: "/goals", label: "Goals", icon: GoalsIcon },
 ];
+
+// The rail also lists the weekly review; the phone reaches it from Today.
+const RAIL_EXTRA: NavItem[] = [{ to: "/review", label: "Weekly review", icon: ReviewIcon }];
 
 function Badge({ count, className }: { count: number; className?: string }) {
   if (count === 0) return null;
@@ -57,7 +67,7 @@ export function AppShell() {
           <Wordmark />
         </div>
         <ul className="flex flex-col gap-1">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {[...NAV, ...RAIL_EXTRA].map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
@@ -77,19 +87,27 @@ export function AppShell() {
             </li>
           ))}
         </ul>
-        {/* DESIGN.md: Reminders sits at the bottom of the rail. */}
-        <NavLink
-          to="/reminders"
-          className={({ isActive }) =>
-            cn(
-              "mt-auto mb-8 flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
-              isActive && "bg-soft font-semibold",
-            )
-          }
-        >
-          <RemindersIcon size={20} />
-          Reminders
-        </NavLink>
+        {/* DESIGN.md: Reminders sits at the bottom of the rail; Settings (approved) just above. */}
+        <div className="mt-auto mb-8 flex flex-col gap-1">
+          {[
+            { to: "/settings", label: "Settings", Icon: SettingsIcon },
+            { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
+          ].map(({ to, label, Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium",
+                  isActive && "bg-soft font-semibold",
+                )
+              }
+            >
+              <Icon size={20} />
+              {label}
+            </NavLink>
+          ))}
+        </div>
       </nav>
 
       <div className="min-w-0 flex-1">

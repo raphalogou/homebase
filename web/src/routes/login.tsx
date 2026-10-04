@@ -1,10 +1,12 @@
 import { type FormEvent, useId, useState } from "react";
 import { Wordmark } from "@/components/app-shell";
+import { WarningIcon } from "@/components/icons";
 import { ScreenTitle } from "@/components/section";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { ApiError, NetworkError } from "@/data/api";
 import { useAuth } from "@/data/hooks";
+import { cn } from "@/lib/utils";
 
 // Approved design: the same top-aligned column as the other screens.
 export default function Login() {
@@ -48,10 +50,16 @@ export default function Login() {
           onChange={(e) => setPassphrase(e.target.value)}
           aria-describedby={message ? `${id}-msg` : undefined}
           aria-invalid={message ? true : undefined}
+          className={cn(message && "border-2 border-danger focus-visible:outline-danger")}
           autoFocus
         />
         {message && (
-          <p id={`${id}-msg`} className="mt-2 text-sm" role="alert">
+          <p
+            id={`${id}-msg`}
+            className="mt-2 flex items-start gap-2 text-sm text-danger"
+            role="alert"
+          >
+            <WarningIcon size={18} className="mt-px shrink-0" />
             {message}
           </p>
         )}

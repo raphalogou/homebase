@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  ClipboardCheck,
   FileText,
   Flag,
   FolderClosed,
@@ -23,9 +24,11 @@ import {
   NotebookPen,
   Paperclip,
   Repeat,
+  Settings,
   StickyNote,
   Sun,
   Trash2,
+  TriangleAlert,
   Undo2,
   X,
 } from "lucide-react";
@@ -67,3 +70,6 @@ export const DeleteIcon = icon(Trash2);
 export const NoticeIcon = icon(CircleAlert);
 export const UndoIcon = icon(Undo2);
 export const RemindersIcon = icon(Bell);
+export const ReviewIcon = icon(ClipboardCheck);
+export const SettingsIcon = icon(Settings);
+export const WarningIcon = icon(TriangleAlert);

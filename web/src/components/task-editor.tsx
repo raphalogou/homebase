@@ -6,7 +6,6 @@ import {
   useOpenGoals,
   usePlanned,
   useProjects,
-  useRepeats,
   useTask,
   useToday,
 } from "@/data/hooks";
@@ -15,6 +14,7 @@ import type { Repeat, Task, TaskStatus } from "@/data/types";
 import { useOpenTask } from "@/lib/open-task";
 import { useIsDesktop } from "@/lib/use-media";
 import { CloseIcon, DeleteIcon, DownIcon, NoticeIcon, UnplannedIcon, UpIcon } from "./icons";
+import { RepeatEditor } from "./repeat-editor";
 import { useNotify } from "./toaster";
 import { Button } from "./ui/button";
 import { Input, Label, Select, Textarea } from "./ui/input";
@@ -33,12 +33,6 @@ export const repeatOptions: { value: RepeatChoice; label: string }[] = [
 /** The simple repeat choices until the full picker arrives (PLAN.md Phase 5). */
 export function repeatFromChoice(c: RepeatChoice): Pick<Repeat, "freq" | "every" | "mode"> | null {
   return c === "none" ? null : { freq: c, every: 1, mode: "after_done" };
-}
-
-// A richer rule made elsewhere shows as its frequency; choosing again here
-// replaces it with the simple form.
-function choiceOf(r: Repeat | undefined): RepeatChoice {
-  return !r || r.deletedAt !== null ? "none" : r.freq;
 }
 
 /** The value of the "Belongs to" select: "", "g:<id>" or "p:<id>". */
@@ -86,7 +80,6 @@ export function parsedParent(v: string): { goalId: string | null; projectId: str
 function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
   const actions = useActions();
   const today = useToday();
-  const repeats = useRepeats();
   const goals = useGoals();
   const desktop = useIsDesktop();
   const planned = usePlanned(today);
@@ -245,29 +238,7 @@ function TaskForm({ task, onClose }: { task: Task; onClose: () => void }) {
         </Select>
       </div>
 
-      <div>
-        <Label htmlFor={`${id}-repeat`}>Repeat</Label>
-        <Select
-          id={`${id}-repeat`}
-          value={choiceOf(task.repeatId ? repeats.get(task.repeatId) : undefined)}
-          onChange={(e) =>
-            void run(() =>
-              actions.setRepeat(task.id, repeatFromChoice(e.target.value as RepeatChoice)),
-            )
-          }
-        >
-          {repeatOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-        {task.repeatId && (
-          <p className="mt-1.5 text-[13px] text-muted-foreground">
-            The next one is added when you finish this one.
-          </p>
-        )}
-      </div>
+      <RepeatEditor task={task} run={run} />
 
       <div>
         <Label htmlFor={`${id}-notes`}>Notes</Label>

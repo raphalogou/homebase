@@ -1,6 +1,7 @@
 // Reminders and this device's Web Push subscription.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { labelFromUA } from "../lib/ua.ts";
 import { ApiError, api, NetworkError } from "./api.ts";
 import { ActionError, useVersion } from "./hooks.ts";
 import { useData } from "./provider.tsx";
@@ -44,7 +45,9 @@ export function useSaveReminder(): (r: ReminderInput) => Promise<void> {
 
 /**
  * Reminder times follow one zone, taken from the browser when the user opens
- * Reminders (docs/SPEC.md section 6). Returns the zone in use.
+ * Reminders (docs/SPEC.md section 6) while it is still the first-run UTC.
+ * After that, Settings is where it changes, so a choice made there sticks.
+ * Returns the zone in use.
  */
 export function useAdoptBrowserZone(): string | null {
   const { store } = useData();
@@ -52,7 +55,7 @@ export function useAdoptBrowserZone(): string | null {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   useEffect(() => {
     const me = store.me;
-    if (!me || !zone || me.tz === zone) return;
+    if (!me || !zone || me.tz === zone || me.tz !== "UTC") return;
     api.putSettings(zone, me.weekStart).then(
       (s) => store.setMe({ ...me, tz: s.tz, weekStart: s.weekStart }),
       () => {},
@@ -80,32 +83,6 @@ function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
   const b64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-}
-
-/** A short name for this device, such as "Chrome on Android". */
-function deviceLabel(): string {
-  const ua = navigator.userAgent;
-  const browser = /Edg\//.test(ua)
-    ? "Edge"
-    : /Firefox\//.test(ua)
-      ? "Firefox"
-      : /Chrome\//.test(ua)
-        ? "Chrome"
-        : /Safari\//.test(ua)
-          ? "Safari"
-          : "Browser";
-  const os = /Android/.test(ua)
-    ? "Android"
-    : /iPhone|iPad/.test(ua)
-      ? "iOS"
-      : /Mac OS X/.test(ua)
-        ? "macOS"
-        : /Windows/.test(ua)
-          ? "Windows"
-          : /Linux/.test(ua)
-            ? "Linux"
-            : "";
-  return os ? `${browser} on ${os}` : browser;
 }
 
 async function registration(): Promise<ServiceWorkerRegistration | null> {
@@ -162,7 +139,7 @@ export function usePush() {
       await refresh();
       throw new ActionError("This browser cannot get reminders. Try Chrome on Android.");
     }
-    await online(api.subscribe(sub.toJSON(), deviceLabel()));
+    await online(api.subscribe(sub.toJSON(), labelFromUA(navigator.userAgent)));
     await refresh();
   }, [refresh]);
 

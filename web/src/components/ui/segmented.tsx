@@ -8,6 +8,8 @@ interface SegmentedProps<T extends string> {
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
   className?: string;
+  /** "ink" fills the chosen option with ink, as in the weekly review. */
+  tone?: "lift" | "ink";
 }
 
 // DESIGN.md: two or three buttons in a --soft track, radius 12 (track) and
@@ -18,6 +20,7 @@ export function Segmented<T extends string>({
   options,
   onChange,
   className,
+  tone = "lift",
 }: SegmentedProps<T>) {
   return (
     <ToggleGroup
@@ -33,7 +36,12 @@ export function Segmented<T extends string>({
         <Toggle
           key={o.value}
           value={o.value}
-          className="h-11 flex-1 rounded-[9px] px-3 text-sm font-semibold text-muted-foreground data-[pressed]:bg-field data-[pressed]:text-ink data-[pressed]:shadow-[0_1px_2px_rgba(20,25,24,.14)]"
+          className={cn(
+            "h-11 flex-1 rounded-[9px] px-3 text-sm font-semibold text-muted-foreground",
+            tone === "ink"
+              ? "data-[pressed]:bg-ink data-[pressed]:text-field"
+              : "data-[pressed]:bg-field data-[pressed]:text-ink data-[pressed]:shadow-[0_1px_2px_rgba(20,25,24,.14)]",
+          )}
         >
           {o.label}
         </Toggle>

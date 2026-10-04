@@ -73,15 +73,6 @@ func (s *server) handleSaveReminders(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.Log, http.StatusOK, list)
 }
 
-func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
-	st, err := s.Sync.GetSettings(r.Context())
-	if err != nil {
-		s.writeError(w, r, err)
-		return
-	}
-	writeJSON(w, s.Log, http.StatusOK, st)
-}
-
 func (s *server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	var req syncer.Settings
 	if err := decode(w, r, smallBody, &req); err != nil {

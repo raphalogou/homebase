@@ -1,0 +1,17 @@
+# /etc/systemd/system/homebase-backup.service, run by homebase-backup.timer.
+# Change /var/backups/homebase to where backups should go.
+
+[Unit]
+Description=Back up Homebase
+
+[Service]
+Type=oneshot
+User=homebase
+Group=homebase
+EnvironmentFile=/etc/homebase/env
+Environment=HOMEBASE_DATA=/var/lib/homebase
+ExecStart=/usr/local/bin/homebase backup /var/backups/homebase
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homebase /var/backups/homebase

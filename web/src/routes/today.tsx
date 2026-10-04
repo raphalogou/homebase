@@ -2,7 +2,13 @@ import { Link, useNavigate } from "react-router";
 import { Columns } from "@/components/app-shell";
 import { CaptureBar } from "@/components/capture-bar";
 import { GoalLine, Progress } from "@/components/goal-line";
-import { NoticeIcon, PlannedIcon, RemindersIcon } from "@/components/icons";
+import {
+  NoticeIcon,
+  PlannedIcon,
+  RemindersIcon,
+  ReviewIcon,
+  SettingsIcon,
+} from "@/components/icons";
 import { InstallButton } from "@/components/install-button";
 import { Empty, ScreenTitle, SectionHeading, SectionLabel } from "@/components/section";
 import { useTaskMeta } from "@/components/task-row";
@@ -19,7 +25,9 @@ import {
   usePlanned,
   useSuggestions,
   useToday,
+  useWeekStart,
 } from "@/data/hooks";
+import { useReviewDue } from "@/data/review";
 import type { Task } from "@/data/types";
 import { longDate } from "@/lib/dates";
 import { useOpenPick } from "@/lib/open-pick";
@@ -83,6 +91,12 @@ export default function Today() {
         )}
       </section>
 
+      {!desktop && (
+        <div className="mt-8">
+          <ReviewLink />
+        </div>
+      )}
+
       {desktop ? (
         <div className="mt-10">
           <CaptureBar />
@@ -91,16 +105,21 @@ export default function Today() {
         <CaptureBar fixed />
       )}
       <div className="mt-8 flex flex-wrap gap-x-5">
-        {/* The phone's tab bar has four places; Reminders is reached from here. */}
-        {!desktop && (
-          <Link
-            to="/reminders"
-            className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
-          >
-            <RemindersIcon size={20} />
-            Reminders
-          </Link>
-        )}
+        {/* The phone's tab bar has four places; these are reached from here. */}
+        {!desktop &&
+          [
+            { to: "/reminders", label: "Reminders", Icon: RemindersIcon },
+            { to: "/settings", label: "Settings", Icon: SettingsIcon },
+          ].map(({ to, label, Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
+            >
+              <Icon size={20} />
+              {label}
+            </Link>
+          ))}
         <InstallButton />
       </div>
     </>
@@ -135,6 +154,9 @@ export default function Today() {
       <section aria-labelledby="side-week" className="mt-10">
         <SectionLabel id="side-week">This week</SectionLabel>
         <WeekStrip selected={null} onSelect={(d) => d && navigate(`/plan?day=${d}`)} />
+        <div className="mt-4">
+          <ReviewLink />
+        </div>
       </section>
       <Suggestions room={room} />
     </>
@@ -206,5 +228,27 @@ function SuggestionRow({ task, room }: { task: Task; room: boolean }) {
         Today
       </Button>
     </li>
+  );
+}
+
+/** From Friday until this week's review is done (docs/SPEC.md section 5). */
+function ReviewLink() {
+  const today = useToday();
+  const weekStart = useWeekStart();
+  const due = useReviewDue(today, weekStart);
+  if (!due) return null;
+  return (
+    <Link
+      to="/review"
+      className="flex min-h-16 items-center gap-3 rounded-[12px] border border-line bg-field px-4"
+    >
+      <ReviewIcon size={20} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Weekly review</span>
+        <span className="block text-[13px] text-muted-foreground">
+          About a minute: keep, pause or drop what went quiet.
+        </span>
+      </span>
+    </Link>
   );
 }

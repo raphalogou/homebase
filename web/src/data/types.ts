@@ -145,3 +145,28 @@ export interface Device {
   createdAt: number;
   lastOk: number | null;
 }
+
+export interface ReviewSummary {
+  weekStart: LocalDate;
+  doneCount: number;
+  doneByGoal: { goalId: string; title: string; count: number }[];
+  quiet: { kind: "project" | "goal"; id: string; title: string; lastActivity: number }[];
+  goalsWithNothing: { id: string; title: string }[];
+  completed: boolean;
+}
+
+export type ReviewAction = "keep" | "pause" | "drop";
+
+export interface ServerSettings {
+  tz: string;
+  weekStart: 0 | 1;
+  calendarUrl: string;
+}
+
+export interface SessionInfo {
+  id: string;
+  label: string;
+  createdAt: number;
+  lastSeen: number;
+  current: boolean;
+}

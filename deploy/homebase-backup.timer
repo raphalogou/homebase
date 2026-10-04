@@ -1,0 +1,13 @@
+# /etc/systemd/system/homebase-backup.timer
+# Enable with: systemctl enable --now homebase-backup.timer
+
+[Unit]
+Description=Back up Homebase every night
+
+[Timer]
+OnCalendar=*-*-* 03:30
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -37,6 +37,7 @@ Rules:
 | `--soft-day` | `#E0E3DC` | Selected day in the week strip |
 | `--dashed` | `#AEB3AC` | Dashed "add" and drop areas |
 | `--highlight` | `#F2E94E` | The highlighter mark only |
+| `--danger` | `#9A3B12` | Only a refused login (owner's request): the field's 2 px border and focus outline, the message and its warning icon. 6.3:1 on `--bg`. Nothing else turns this colour. |
 | `--notif-bg` / `--notif-card` | `#1B1C1F` / `#2E3034` | Notification preview (always dark) |
 
 Text on `--bg` and `--field` must stay at 4.5:1 or better (3:1 for text 24 px and up). Verify `--muted` after any change.
@@ -132,7 +133,8 @@ Line length stays under 80 characters; the main column is capped at 720 to 780 p
 | Project | `/projects/:id` | Title, progress, Tasks with an add field, Notes (editable), Attachments. |
 | Goal | `/goals/:id` | Serif title, progress, Projects, Tasks on their own, Notes, Links. Desktop shows the goal list on the left. |
 | Goals | `/goals` | Goal lines, then the approved "New goal" field under the list: a labelled field in the serif (placeholder "A statement of intent") and an ink "Add" button. |
-| Weekly review | `/review` | One-sentence summary in serif; "Gone quiet" with Keep, Pause, Drop; "Next week" shows a goal with nothing done and "Plan a task"; button "Finish review". |
+| Weekly review | `/review` | One-sentence summary in serif; "Gone quiet" with Keep, Pause, Drop; "Next week" shows a goal with nothing done and "Plan a task"; button "Finish review". Built as: Keep is chosen by default; "Plan a task" opens the goal. The link on Today (from Friday until done) is a bordered row with the review icon, in the right column on desktop and under Your three on the phone; the rail lists "Weekly review" after Goals. |
+| Settings | `/settings` | Approved: one plain page. "Time and week" (zone select, Monday or Sunday), "Calendar" (what the link is for, the link with Copy, "Make a new link"), "Sessions" (each browser with when it was last used and "Log out" for others), then "Log out of this device". Rail: above Reminders at the bottom. Phone: a link beside Reminders at the foot of Today. |
 | Reminders | `/reminders` | Three slots (time, on or off, kind, description); devices; "Send a test now". Built as: one row per slot with the time as a 34 px tabular time input (a complete time saves at once), the kind name and a one-line description, and the 52 by 32 toggle; a line under the title says which zone the times use. "This device" shows its state (not supported, blocked, off with "Get reminders on this device", on with "Send a test now" and "Turn off on this device"). "Other devices" lists the rest with when each was last reached and a Remove button. Desktop reaches it from the bottom of the rail; the phone from a "Reminders" link at the foot of Today, since the tab bar has four places. |
 | Login | `/login` | Approved: the same top-aligned column as other screens. Highlighted wordmark, 36 px "Log in", one muted sentence, a labelled passphrase field, a full-width primary "Log in". A wrong passphrase shows a plain ink sentence under the field. |
 
@@ -157,6 +159,8 @@ None, except: the bottom sheet slide (180 ms), the lift of a dragged row, and fo
 
 ## Not designed yet
 
-Dark theme, empty, loading and error states, the offline indicator and the repeat picker. Design these in this style and show the owner before building.
+Dark theme, empty, loading and error states, and the offline indicator. Design these in this style and show the owner before building.
+
+The repeat picker is approved: it grows in place under "Repeat" in the task form. Without a rule, "Does not repeat" and a "Make it repeat" button (every week, from when it is done). With one: a number and a unit, "Counts from" (When it's done, The due date), weekday circles when weekly from the due date, "Ends" (Never, On a date), a summary sentence in the serif, and "Stop repeating". It saves as it changes.
 
 Approved since: the login screen and goal creation (see Screens); the phone Projects list is the desktop list in one column. Deleting a goal or project asks first: a bottom sheet on the phone, a small centred dialog (radius 20) on desktop, with the title "Delete “Name”?", one sentence of counts ("It has 4 tasks and 2 attachments."), the primary "Keep tasks, delete project", the secondary "Delete project and tasks", and a text "Cancel". With nothing inside, one primary "Delete project".

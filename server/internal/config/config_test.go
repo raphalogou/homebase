@@ -78,3 +78,27 @@ func TestLoad(t *testing.T) {
 		})
 	}
 }
+
+func TestPassphraseHashQuotes(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"$argon2id$x", "$argon2id$x"},
+		{"'$argon2id$x'", "$argon2id$x"},
+		{`"$argon2id$x"`, "$argon2id$x"},
+		{`'$argon2id$x"`, `'$argon2id$x"`},
+		{"'", "'"},
+	}
+	for _, tt := range tests {
+		c, err := Load(func(k string) string {
+			if k == "HOMEBASE_PASSPHRASE_HASH" {
+				return tt.in
+			}
+			return ""
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.PassphraseHash != tt.want {
+			t.Errorf("%q -> %q, want %q", tt.in, c.PassphraseHash, tt.want)
+		}
+	}
+}
