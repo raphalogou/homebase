@@ -183,14 +183,21 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
-// logRequests logs method, path, status and duration. The query string is
+// logRequests logs method, path, status and duration, quiet sync checks at
+// debug level. The query string is
 // left out, and calendar paths are redacted because the path is the secret.
 func logRequests(log *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		log.Info("request",
+		// Every open device checks for changes every few minutes; only a
+		// failed check is worth a line at the default level.
+		level := slog.LevelInfo
+		if r.Method == http.MethodGet && r.URL.Path == "/api/sync" && rec.status < 400 {
+			level = slog.LevelDebug
+		}
+		log.Log(r.Context(), level, "request",
 			"method", r.Method,
 			"path", loggedPath(r.URL.Path),
 			"status", rec.status,

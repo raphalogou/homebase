@@ -181,6 +181,10 @@ export class LocalStore {
    * bring the final one.
    */
   async apply(changes: Changes, rev?: number): Promise<void> {
+    // Most pulls bring nothing: skip the write and the re-render of every screen.
+    const empty =
+      ROW_STORES.every((name) => changes[name].length === 0) && changes.reminders.length === 0;
+    if (empty && (rev === undefined || rev === this.rev)) return;
     const tx = this.db.transaction(
       [...ROW_STORES, "reminders" as const, "meta" as const],
       "readwrite",

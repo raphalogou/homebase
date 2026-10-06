@@ -356,3 +356,27 @@ func TestLoggedPath(t *testing.T) {
 		}
 	}
 }
+
+func TestQuietSyncChecksLogAtDebug(t *testing.T) {
+	var buf strings.Builder
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	status := http.StatusOK
+	h := logRequests(log, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }))
+	for _, tt := range []struct {
+		method, path string
+		status       int
+		logged       bool
+	}{
+		{"GET", "/api/sync", 200, false},
+		{"GET", "/api/sync", 401, true},
+		{"POST", "/api/sync", 200, true},
+		{"GET", "/api/settings", 200, true},
+	} {
+		buf.Reset()
+		status = tt.status
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(tt.method, tt.path, nil))
+		if got := strings.Contains(buf.String(), "request"); got != tt.logged {
+			t.Errorf("%s %s %d: logged = %v, want %v", tt.method, tt.path, tt.status, got, tt.logged)
+		}
+	}
+}

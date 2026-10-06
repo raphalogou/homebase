@@ -7,9 +7,21 @@ import type { SyncTable } from "./types.ts";
 export type SyncState = "idle" | "syncing" | "offline" | "error";
 
 const DEBOUNCE_MS = 800;
-const INTERVAL_MS = 60_000;
 const MAX_BACKOFF_MS = 60_000;
 const PUSH_BATCH = 500;
+/** Focus, the tab showing and the timer skip a sync this soon after the last one. */
+export const QUIET_MS = 15_000;
+export const POLL_MIN_MS = 60_000;
+export const POLL_MAX_MS = 10 * 60_000;
+
+/**
+ * The wait before the next timed check: a minute after anything changed,
+ * then twice as long after each quiet check, up to ten minutes. Every
+ * request wakes the phone's radio, so a planner left open costs little.
+ */
+export function nextPoll(prev: number, changed: boolean): number {
+  return changed ? POLL_MIN_MS : Math.min(prev * 2, POLL_MAX_MS);
+}
 
 export class SyncEngine {
   state: SyncState = "idle";
@@ -24,6 +36,9 @@ export class SyncEngine {
   private retry: ReturnType<typeof setTimeout> | undefined;
   private backoff = 2000;
   private stopFns: (() => void)[] = [];
+  private poll: ReturnType<typeof setTimeout> | undefined;
+  private pollDelay = POLL_MIN_MS;
+  private lastOk = 0;
 
   private readonly store: LocalStore;
   private readonly api: Api;
@@ -49,21 +64,30 @@ export class SyncEngine {
     for (const fn of this.stateListeners) fn();
   }
 
-  /** Starts the triggers: focus, coming online, visibility, every minute. */
+  /**
+   * Starts the triggers. Coming online and a push message sync at once;
+   * focus and the tab showing sync unless one just ran (they often fire
+   * together); a timer checks while the tab shows, less often while
+   * nothing changes (nextPoll).
+   */
   start(): void {
     const now = () => void this.run();
+    const passive = () => {
+      // Focus and the tab showing often fire together: one sync serves both.
+      if (
+        document.visibilityState === "visible" &&
+        !this.running &&
+        Date.now() - this.lastOk >= QUIET_MS
+      ) {
+        void this.run();
+      }
+    };
     // The browser knows at once; a request would only fail after a timeout.
     const offline = () => this.setState("offline", this.retryAt);
-    const visible = () => {
-      if (document.visibilityState === "visible") void this.run();
-    };
-    window.addEventListener("focus", now);
+    window.addEventListener("focus", passive);
     window.addEventListener("online", now);
     window.addEventListener("offline", offline);
-    document.addEventListener("visibilitychange", visible);
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void this.run();
-    }, INTERVAL_MS);
+    document.addEventListener("visibilitychange", passive);
     // The service worker forwards push messages that carry the sync hint.
     const message = (e: MessageEvent) => {
       if ((e.data as { type?: string } | null)?.type === "sync") void this.run();
@@ -71,11 +95,11 @@ export class SyncEngine {
     navigator.serviceWorker?.addEventListener("message", message);
 
     this.stopFns.push(
-      () => window.removeEventListener("focus", now),
+      () => window.removeEventListener("focus", passive),
       () => window.removeEventListener("online", now),
       () => window.removeEventListener("offline", offline),
-      () => document.removeEventListener("visibilitychange", visible),
-      () => clearInterval(timer),
+      () => document.removeEventListener("visibilitychange", passive),
+      () => clearTimeout(this.poll),
       () => navigator.serviceWorker?.removeEventListener("message", message),
     );
     void this.run();
@@ -90,6 +114,7 @@ export class SyncEngine {
 
   /** Syncs shortly after a local change, so quick edits travel together. */
   soon(): void {
+    this.pollDelay = POLL_MIN_MS;
     clearTimeout(this.debounce);
     this.debounce = setTimeout(() => void this.run(), DEBOUNCE_MS);
   }
@@ -115,9 +140,12 @@ export class SyncEngine {
     clearTimeout(this.retry);
     this.setState("syncing");
     try {
+      const pushed = this.store.pending().length > 0;
       await this.push();
-      await this.pull();
+      const pulled = await this.pull();
       this.backoff = 2000;
+      this.lastOk = Date.now();
+      this.schedulePoll(pushed || pulled);
       if (!this.loaded) {
         this.loaded = true;
         await this.store.setLoaded();
@@ -161,11 +189,24 @@ export class SyncEngine {
     }
   }
 
-  private async pull(): Promise<void> {
+  /** Pulls every page; true when any of them brought something. */
+  private async pull(): Promise<boolean> {
+    let brought = false;
     for (;;) {
       const page = await this.api.pull(this.store.rev);
+      brought ||= page.rev !== this.store.rev;
       await this.store.apply(page, page.rev);
-      if (!page.more) return;
+      if (!page.more) return brought;
     }
+  }
+
+  private schedulePoll(changed: boolean): void {
+    clearTimeout(this.poll);
+    if (this.stopFns.length === 0) return; // stopped
+    this.pollDelay = nextPoll(this.pollDelay, changed);
+    this.poll = setTimeout(() => {
+      // A hidden tab waits; showing it again syncs through the passive trigger.
+      if (document.visibilityState === "visible") void this.run();
+    }, this.pollDelay);
   }
 }
