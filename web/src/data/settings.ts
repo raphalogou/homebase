@@ -1,4 +1,5 @@
-// Settings: zone and week start, the calendar link, backups, the account, and sessions.
+// Settings: zone and week start, the calendar link, backups, the account,
+// sessions, and for the owner the people on this server.
 
 import { useCallback } from "react";
 import { api } from "./api.ts";
@@ -15,6 +16,10 @@ export function useSessions() {
 
 export function useAccount() {
   return useOnline(api.account);
+}
+
+export function usePeople() {
+  return useOnline(api.people);
 }
 
 export function useSettingsActions() {
@@ -54,7 +59,19 @@ export function useSettingsActions() {
       [store],
     ),
     changePassphrase: useCallback(
-      (current: string, next: string) => api.changePassphrase(current, next),
+      async (current: string, next: string) => {
+        const info = await api.changePassphrase(current, next);
+        if (store.me) await store.setMe({ ...store.me, mustChange: false });
+        return info;
+      },
+      [store],
+    ),
+    addPerson: useCallback(
+      (username: string, passphrase: string) => api.addPerson(username, passphrase),
+      [],
+    ),
+    removePerson: useCallback(
+      (id: string) => needsServer(api.removePerson(id), "Removing a person"),
       [],
     ),
     revoke: useCallback(

@@ -90,6 +90,13 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       if (!ready) return;
       await start();
       const me = await api.me();
+      // Someone else used this device last: their tasks and unsent changes
+      // must not reach this account, so the device starts empty.
+      const prev = ready.store.me;
+      if (prev && (prev.userId ? prev.userId !== me.userId : prev.username !== me.username)) {
+        ready.engine.stop();
+        await ready.store.reset();
+      }
       await ready.store.setMe(me);
       await ready.store.setSignedIn(true);
       setAuth("signedIn");

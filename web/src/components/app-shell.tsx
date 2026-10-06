@@ -7,6 +7,7 @@ import { useOpenTask } from "@/lib/open-task";
 import { keyFor } from "@/lib/shortcuts";
 import { useIsDesktop } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
+import { FirstPassphrase } from "./first-passphrase";
 import {
   GoalsIcon,
   InboxIcon,
@@ -174,6 +175,7 @@ export function AppShell() {
         <TaskSheet />
         <PickDialog />
         <SettingsDialog />
+        <FirstPassphrase />
         <RemindersDialog />
         <Toaster />
       </div>

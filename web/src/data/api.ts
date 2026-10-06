@@ -7,6 +7,7 @@ import type {
   Device,
   Me,
   Op,
+  Person,
   Project,
   PullResult,
   PushResult,
@@ -165,6 +166,10 @@ export const api = {
   settings: () => request<ServerSettings>("GET", "/api/settings"),
   rotateCalendar: () => request<{ url: string }>("POST", "/api/calendar/rotate"),
   sessions: () => request<SessionInfo[]>("GET", "/api/sessions"),
+  people: () => request<Person[]>("GET", "/api/people"),
+  addPerson: (username: string, passphrase: string) =>
+    request<Person>("POST", "/api/people", { username, passphrase }),
+  removePerson: (id: string) => request<void>("POST", "/api/people/remove", { id }),
   revokeSession: (id: string) => request<void>("POST", "/api/sessions/revoke", { id }),
   putSettings: (tz: string, weekStart: 0 | 1, backups?: boolean) =>
     request<{ tz: string; weekStart: 0 | 1; backups: boolean }>("PUT", "/api/settings", {

@@ -1,20 +1,29 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { useId, useMemo, useState } from "react";
+import { type FormEvent, useId, useMemo, useState } from "react";
 import { ACCOUNT_VIEWS } from "@/components/account-forms";
+import { PassphraseField, TextField } from "@/components/form-field";
 import { CheckIcon, ExternalIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
 import { Empty } from "@/components/section";
 import { useShowShortcuts } from "@/components/shortcuts";
 import { InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
-import { ResponsiveDialog } from "@/components/ui/dialog";
+import { DialogActions, ResponsiveDialog } from "@/components/ui/dialog";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
-import { ActionError, useAuth, useToday, useWeekStart } from "@/data/hooks";
+import { ApiError, NetworkError } from "@/data/api";
+import { ActionError, useAuth, useToday, useVersion, useWeekStart } from "@/data/hooks";
 import { useData } from "@/data/provider";
-import { useAccount, useServerSettings, useSessions, useSettingsActions } from "@/data/settings";
+import {
+  useAccount,
+  usePeople,
+  useServerSettings,
+  useSessions,
+  useSettingsActions,
+} from "@/data/settings";
 import type { SessionInfo } from "@/data/types";
+import { USERNAME_HINT } from "@/lib/account";
 import { changedOn } from "@/lib/dates";
 import { useModal } from "@/lib/modal";
 import { setTheme, type Theme, useTheme } from "@/lib/theme";
@@ -37,6 +46,7 @@ const TABS = [
   { value: "backups", label: "Backups" },
   { value: "account", label: "Account" },
   { value: "sessions", label: "Sessions" },
+  { value: "people", label: "People" },
   { value: "about", label: "About" },
 ] as const;
 
@@ -53,7 +63,8 @@ const tabClass =
 // Time and week, Calendar, Backups, Account, Sessions, About (?settings=calendar; "1" is the
 // first). The tabs are a column on desktop and a scrolling row on the phone.
 // Changing the username or passphrase swaps the content for that form
-// (?settings=username), with a back button to the Account tab.
+// (?settings=username), with a back button to the Account tab; so does
+// removing a person (?settings=remove-<id>), back to the People tab.
 export function SettingsDialog() {
   const [param, setView] = useModal("settings");
   const desktop = useIsDesktop();
@@ -61,10 +72,30 @@ export function SettingsDialog() {
   const { logout } = useAuth();
   const notify = useNotify();
   const change = isChange(param) ? param : null;
-  const tab: Tab | null = param === "1" ? "time" : isTab(param) ? param : null;
+  const { store } = useData();
+  useVersion();
+  const owner = store.me?.owner === true;
+  // People is the owner's alone; anyone else asking for it gets the first tab.
+  const tabs = TABS.filter((t) => owner || t.value !== "people");
+  const asked: Tab | null = param === "1" ? "time" : isTab(param) ? param : null;
+  const tab: Tab | null = asked === "people" && !owner ? "time" : asked;
   const account = change ? ACCOUNT_VIEWS[change] : null;
-  const back = () => setView("account", true);
+  const removeId = owner && param?.startsWith("remove-") ? param.slice("remove-".length) : null;
+  // Leaving a swapped view puts focus back on its tab, not on the page.
+  const returnTo = (t: Tab) => {
+    setView(t, true);
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>("[role=dialog] [role=tab][data-active]")?.focus(),
+    );
+  };
+  const back = () => returnTo("account");
+  const toPeople = () => returnTo("people");
   const close = () => setView(null);
+  const swapped = account
+    ? { title: account.title, back }
+    : removeId
+      ? { title: "Remove a person", back: toPeople }
+      : null;
 
   async function run(fn: () => Promise<unknown>, done?: string) {
     try {
@@ -78,14 +109,16 @@ export function SettingsDialog() {
 
   return (
     <ResponsiveDialog
-      open={tab !== null || change !== null}
+      open={tab !== null || change !== null || removeId !== null}
       onOpenChange={(o) => !o && close()}
-      title={account?.title ?? "Settings"}
+      title={swapped?.title ?? "Settings"}
       description={account?.description}
-      width={account ? 560 : 760}
-      back={account ? { label: "Back to Settings", onClick: back } : undefined}
+      width={swapped ? 560 : 760}
+      back={swapped ? { label: "Back to Settings", onClick: swapped.back } : undefined}
     >
-      {account ? (
+      {removeId ? (
+        <RemovePerson id={removeId} onDone={toPeople} />
+      ) : account ? (
         <account.Form
           onClose={back}
           onSaved={() =>
@@ -108,7 +141,7 @@ export function SettingsDialog() {
           >
             <div className="flex shrink-0 flex-col min-[900px]:w-44">
               <Tabs.List className="-mx-6 flex gap-1 overflow-x-auto px-6 [scrollbar-width:none] min-[900px]:mx-0 min-[900px]:flex-col min-[900px]:px-0">
-                {TABS.map((t) => (
+                {tabs.map((t) => (
                   <Tabs.Tab key={t.value} value={t.value} className={tabClass}>
                     {t.label}
                   </Tabs.Tab>
@@ -149,6 +182,11 @@ export function SettingsDialog() {
                   </Button>
                 </div>
               </Tabs.Panel>
+              {owner && (
+                <Tabs.Panel value="people">
+                  <People onRemove={(id) => setView(`remove-${id}`)} />
+                </Tabs.Panel>
+              )}
               <Tabs.Panel value="about">
                 <About />
               </Tabs.Panel>
@@ -368,6 +406,175 @@ function Backups({ run }: { run: Run }) {
         another one, or copy this folder elsewhere now and then.
       </p>
     </div>
+  );
+}
+
+function People({ onRemove }: { onRemove: (id: string) => void }) {
+  const [people, reload] = usePeople();
+  const actions = useSettingsActions();
+  const notify = useNotify();
+  const [username, setUsername] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ field: "username" | "passphrase"; message: string } | null>(
+    null,
+  );
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const p = await actions.addPerson(username, passphrase);
+      notify({ title: `Added ${p.username}`, icon: CheckIcon });
+      setUsername("");
+      setPassphrase("");
+      reload();
+    } catch (err) {
+      if (err instanceof ApiError)
+        setError({
+          field: err.field === "username" ? "username" : "passphrase",
+          message: err.message,
+        });
+      else if (err instanceof NetworkError)
+        setError({ field: "passphrase", message: "Adding a person needs a connection." });
+      else throw err;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-muted-foreground">
+        Everyone has their own planner on this server: their own tasks, reminders and settings.
+        Nobody sees anyone else's.
+      </p>
+      {people.state === "loading" && (
+        <div className="mt-4">
+          <SkeletonRows kind="line" count={2} label="Loading people" />
+        </div>
+      )}
+      {people.state === "offline" && <Empty>The list of people needs a connection.</Empty>}
+      {people.state === "ready" && (
+        <ul className="mt-4">
+          {people.data.map((p) => (
+            <li key={p.id} className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
+              {
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[17px]">{p.username}</p>
+                    <p className="text-[13px] text-muted-foreground">
+                      {p.owner
+                        ? "Owner"
+                        : p.mustChange
+                          ? "Has not chosen a passphrase yet"
+                          : "Member"}
+                    </p>
+                  </div>
+                  {!p.owner && (
+                    <Button
+                      variant="text"
+                      aria-label={`Remove ${p.username}`}
+                      onClick={() => onRemove(p.id)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </>
+              }
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        onSubmit={add}
+        noValidate
+        className="mt-8 flex flex-col gap-4 border-t border-line pt-6"
+      >
+        <h3 className="font-semibold">Add a person</h3>
+        <TextField
+          label="Username"
+          placeholder={USERNAME_HINT}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          value={username}
+          onChange={(e) => {
+            setUsername(e.target.value);
+            setError(null);
+          }}
+          error={error?.field === "username" ? error.message : undefined}
+        />
+        <PassphraseField
+          label="One-time passphrase"
+          hint="Tell them yourself. They choose their own when they first log in."
+          autoComplete="new-password"
+          value={passphrase}
+          onChange={(e) => {
+            setPassphrase(e.target.value);
+            setError(null);
+          }}
+          error={error?.field === "passphrase" ? error.message : undefined}
+        />
+        <Button type="submit" className="self-start" disabled={busy}>
+          {busy ? "Adding" : "Add person"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+/** Confirms removing a person, in place of the Settings content. */
+function RemovePerson({ id, onDone }: { id: string; onDone: () => void }) {
+  const [people] = usePeople();
+  const actions = useSettingsActions();
+  const notify = useNotify();
+  const [busy, setBusy] = useState(false);
+  if (people.state === "loading") return <SkeletonRows kind="line" count={1} label="Loading" />;
+  if (people.state !== "ready") return <Empty>Removing a person needs a connection.</Empty>;
+  const person = people.data.find((p) => p.id === id && !p.owner);
+  if (!person) {
+    return (
+      <>
+        <Empty>This person is no longer on the server.</Empty>
+        <DialogActions>
+          <Button onClick={onDone}>Back to People</Button>
+        </DialogActions>
+      </>
+    );
+  }
+
+  async function remove() {
+    if (!person) return;
+    setBusy(true);
+    try {
+      await actions.removePerson(person.id);
+      notify({ title: `Removed ${person.username}`, icon: CheckIcon });
+      onDone();
+    } catch (err) {
+      setBusy(false);
+      if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
+      else throw err;
+    }
+  }
+
+  return (
+    <>
+      <p className="text-[17px]">
+        <span className="font-semibold">{person.username}</span> can no longer log in, and their
+        planner moves to the server's removed folder. Moving it back undoes this.
+      </p>
+      <DialogActions>
+        <Button onClick={() => void remove()} disabled={busy}>
+          {busy ? "Removing" : `Remove ${person.username}`}
+        </Button>
+        {/* Focus starts on Cancel, so a stray Enter does nothing drastic. */}
+        <Button variant="text" className="self-center" autoFocus onClick={onDone}>
+          Cancel
+        </Button>
+      </DialogActions>
+    </>
   );
 }
 

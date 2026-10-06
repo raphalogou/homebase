@@ -136,11 +136,26 @@ export interface Me {
   rev: number;
   /** Kept after a session ends, to fill in Log in. */
   username: string;
+  /** Whose planner this device holds; a different person logging in empties it first. */
+  userId?: string;
+  owner?: boolean;
+  /** Set while the account still has the one-time passphrase the owner gave. */
+  mustChange?: boolean;
+}
+
+/** Someone with a planner on this server, as the owner's People tab lists them. */
+export interface Person {
+  id: string;
+  username: string;
+  owner: boolean;
+  mustChange: boolean;
 }
 
 export interface AccountInfo {
   username: string;
   passphraseChangedAt: number;
+  owner: boolean;
+  mustChange: boolean;
 }
 
 export type ReminderInput = Pick<Reminder, "slot" | "enabled" | "atLocal" | "kind">;

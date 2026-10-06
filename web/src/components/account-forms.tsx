@@ -20,6 +20,12 @@ interface ChangeProps {
   onSaved: (info: AccountInfo) => void;
 }
 
+interface PassphraseProps extends ChangeProps {
+  /** Replacing the owner's one-time passphrase: other labels, and the text
+   * button logs out instead of cancelling. */
+  first?: { onLogOut: () => void };
+}
+
 const OFFLINE = "This needs a connection. Try again when you are online.";
 
 /** Puts a server refusal under the field it names, or under fallback. */
@@ -118,7 +124,7 @@ function UsernameForm({ onClose, onSaved }: ChangeProps) {
 
 type PassField = "current" | "next" | "confirm";
 
-function PassphraseForm({ onClose, onSaved }: ChangeProps) {
+export function PassphraseForm({ onClose, onSaved, first }: PassphraseProps) {
   const actions = useSettingsActions();
   const [values, setValues] = useState<Record<PassField, string>>({
     current: "",
@@ -128,7 +134,11 @@ function PassphraseForm({ onClose, onSaved }: ChangeProps) {
   const [busy, setBusy] = useState(false);
   const errors = useFieldErrors<PassField>();
   const local: Record<PassField, string> = {
-    current: values.current ? "" : "Enter your current passphrase.",
+    current: values.current
+      ? ""
+      : first
+        ? "Enter the one-time passphrase."
+        : "Enter your current passphrase.",
     next: passphraseError(values.next),
     confirm: confirmError(values.next, values.confirm),
   };
@@ -160,7 +170,7 @@ function PassphraseForm({ onClose, onSaved }: ChangeProps) {
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
       <PassphraseField
-        label="Current passphrase"
+        label={first ? "One-time passphrase" : "Current passphrase"}
         autoComplete="current-password"
         autoFocus
         {...field("current")}
@@ -180,8 +190,8 @@ function PassphraseForm({ onClose, onSaved }: ChangeProps) {
         <Button type="submit" disabled={busy}>
           {busy ? "Saving" : "Save passphrase"}
         </Button>
-        <Button variant="text" className="self-center" onClick={onClose}>
-          Cancel
+        <Button variant="text" className="self-center" onClick={first?.onLogOut ?? onClose}>
+          {first ? "Log out" : "Cancel"}
         </Button>
       </DialogActions>
     </form>
