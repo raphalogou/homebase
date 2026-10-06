@@ -135,7 +135,7 @@ func (s *server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	c, _ := r.Cookie(cookieName)
 	token := ""
 	if c != nil {
-		token = c.Value
+		token = tokenOf(c.Value)
 	}
 	list, err := s.Auth.Sessions(r.Context(), token)
 	if err != nil {

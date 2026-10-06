@@ -7,18 +7,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"homebase/internal/auth"
-	"homebase/internal/db"
-	"homebase/internal/files"
-	"homebase/internal/migrate"
 	"homebase/internal/push"
-	"homebase/internal/store"
-	"homebase/internal/syncer"
-	"homebase/migrations"
+	"homebase/internal/tenant"
 )
 
 const (
@@ -46,48 +42,47 @@ func newFreshServer(t *testing.T) http.Handler {
 
 func buildServer(t *testing.T, client *http.Client, withAccount bool) http.Handler {
 	t.Helper()
-	d, err := db.OpenMemory()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = d.Close() })
-	ctx := context.Background()
-	if err := migrate.Run(ctx, d, migrations.FS, time.Now); err != nil {
-		t.Fatal(err)
-	}
-	st := store.NewSQLite(d)
-	sy := syncer.New(st, time.Now)
-	if err := sy.Init(ctx); err != nil {
-		t.Fatal(err)
-	}
-	phc, err := auth.HashPassphrase(pass)
-	if err != nil {
-		t.Fatal(err)
-	}
-	au := auth.New(st, time.Now)
-	if withAccount {
-		if _, err := au.Bootstrap(ctx, phc); err != nil {
-			t.Fatal(err)
-		}
-	}
-	web := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("web")) })
-	blobs, err := files.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	h, _ := buildPeople(t, client, withAccount)
+	return h
+}
+
+// buildPeople is buildServer that also returns the registry, for tests
+// about several people.
+func buildPeople(t *testing.T, client *http.Client, withAccount bool) (http.Handler, *tenant.Registry) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	keys, err := push.LoadOrCreateKeys(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(Deps{
-		Keys:   keys,
-		Sender: push.NewSender(keys, "mailto:me@example.com", client, time.Now),
-		Blobs:  blobs,
-		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Auth:   au,
-		Sync:   sy,
-		Web:    web,
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	sender := push.NewSender(keys, "mailto:me@example.com", client, time.Now)
+	people, err := tenant.Open(ctx, t.TempDir(), time.Now, func(_ context.Context, people *tenant.Registry, tn *tenant.Tenant) error {
+		tn.Handler = Tenant(Deps{
+			Log: log, Auth: tn.Auth, Sync: tn.Sync, Blobs: tn.Blobs, UserID: tn.ID, People: people,
+			Keys: keys, Sender: sender, BackupDir: filepath.Join(tn.Dir, "backups"), BackupInterval: 24 * time.Hour,
+		})
+		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(people.Close)
+	if withAccount {
+		phc, err := auth.HashPassphrase(pass)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := people.Create(true, func(tn *tenant.Tenant) error {
+			_, err := tn.Auth.Bootstrap(ctx, phc)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	web := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("web")) })
+	return New(RootDeps{Log: log, People: people, Web: web}), people
 }
 
 type call struct {
@@ -174,7 +169,10 @@ func TestRoutes(t *testing.T) {
 		{"push", call{method: "POST", path: "/api/sync", body: `{"base":0,"ops":[]}`, cookie: token}, 200, ""},
 		{"promote unknown task", call{method: "POST", path: "/api/promote", body: `{"taskId":"01HZZZZZZZZZZZZZZZZZZZ0001"}`, cookie: token}, 404, "not_found"},
 		{"unknown api route", call{method: "GET", path: "/api/nope", cookie: token}, 404, "not_found"},
-		{"login wrong method falls to the API catch-all", call{method: "GET", path: "/api/login"}, 404, "not_found"},
+		// Without a session, every path the root does not answer asks to log
+		// in, so it cannot be used to find out which endpoints exist.
+		{"login wrong method needs a session", call{method: "GET", path: "/api/login"}, 401, "unauthorized"},
+		{"login wrong method with a session", call{method: "GET", path: "/api/login", cookie: token}, 404, "not_found"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -480,14 +480,14 @@ func (t *sqliteTx) LogReview(weekStart string, doneAt int64) error {
 
 func (t *sqliteTx) Account() (Account, error) {
 	var a Account
-	err := t.row(`SELECT username, passphrase_hash, changed_at FROM account WHERE id = 1`).
-		Scan(&a.Username, &a.PassphraseHash, &a.ChangedAt)
+	err := t.row(`SELECT username, passphrase_hash, changed_at, owner, must_change FROM account WHERE id = 1`).
+		Scan(&a.Username, &a.PassphraseHash, &a.ChangedAt, &a.Owner, &a.MustChange)
 	return a, notFound(err)
 }
 
 func (t *sqliteTx) InsertAccount(a Account) error {
-	return t.exec(`INSERT INTO account(id, username, passphrase_hash, changed_at) VALUES (1, ?, ?, ?)`,
-		a.Username, a.PassphraseHash, a.ChangedAt)
+	return t.exec(`INSERT INTO account(id, username, passphrase_hash, changed_at, owner, must_change) VALUES (1, ?, ?, ?, ?, ?)`,
+		a.Username, a.PassphraseHash, a.ChangedAt, a.Owner, a.MustChange)
 }
 
 func (t *sqliteTx) SetUsername(username string) error {
@@ -495,7 +495,8 @@ func (t *sqliteTx) SetUsername(username string) error {
 }
 
 func (t *sqliteTx) SetPassphraseHash(hash string, changedAt int64) error {
-	return t.exec(`UPDATE account SET passphrase_hash = ?, changed_at = ? WHERE id = 1`, hash, changedAt)
+	// A passphrase the person chose ends the one-time one.
+	return t.exec(`UPDATE account SET passphrase_hash = ?, changed_at = ?, must_change = 0 WHERE id = 1`, hash, changedAt)
 }
 
 // Sessions

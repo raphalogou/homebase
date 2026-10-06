@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"homebase/internal/apperr"
@@ -25,18 +26,52 @@ const (
 	LoginWindow = 10 * time.Minute
 )
 
-// Auth checks the account's passphrase and manages sessions.
+// Auth checks one person's passphrase and manages their sessions. Each
+// person has their own database, so their own Auth.
 type Auth struct {
 	store   store.Store
 	limiter *Limiter
 	now     func() time.Time
+	// Taken reports whether another person already has a username. Nil
+	// means there is nobody else.
+	Taken func(ctx context.Context, username string) (bool, error)
 }
 
-// New returns an Auth. The account lives in the database; see Setup and
-// Bootstrap.
+// New returns an Auth with its own login limit. The account lives in the
+// database; see Setup and Bootstrap.
 func New(s store.Store, now func() time.Time) *Auth {
-	return &Auth{store: s, limiter: NewLimiter(MaxLogins, LoginWindow, now), now: now}
+	return NewShared(s, NewLimiter(MaxLogins, LoginWindow, now), now)
 }
+
+// NewShared returns an Auth that counts failures in l, so guessing across
+// several people's accounts shares one limit per address.
+func NewShared(s store.Store, l *Limiter, now func() time.Time) *Auth {
+	return &Auth{store: s, limiter: l, now: now}
+}
+
+// Reject answers a login for a username nobody has. It counts the failure
+// and spends as long as a real check, so the answer and its timing never
+// tell an unknown username from a wrong passphrase.
+func Reject(l *Limiter, passphrase, addr string) error {
+	if !l.Allow(addr) {
+		return errLimited
+	}
+	_ = decoy().Matches(passphrase)
+	l.Fail(addr)
+	return errNoMatch
+}
+
+var decoy = sync.OnceValue(func() Hash {
+	phc, err := HashPassphrase("not a real passphrase")
+	if err != nil {
+		panic(err)
+	}
+	h, err := ParseHash(phc)
+	if err != nil {
+		panic(err)
+	}
+	return h
+})
 
 // errNoMatch never says whether the username or the passphrase was wrong.
 var errNoMatch = apperr.ForField(apperr.Unauthorized, "passphrase", "That username or passphrase did not match.")

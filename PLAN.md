@@ -2,7 +2,7 @@
 
 Build in this order. Do not start a phase before the previous one meets its "Done when". Tick boxes as you go and note surprises at the bottom of the phase. The data model, sync protocol and API are fixed in `docs/SPEC.md`; the look is fixed in `DESIGN.md`.
 
-Status: Phases 0 to 6 done; Phase 4's reminders still need a test on a real phone over HTTPS.
+Status: Phases 0 to 6 done. The owner tested Phase 4's reminders on a real phone over HTTPS on 5 October 2026.
 
 ## Decisions already made
 
@@ -122,7 +122,7 @@ Notes:
 - Web Push is written with the standard library only (`crypto/ecdh`, `crypto/hkdf`, AES-GCM, ES256), so no module was added. The encryption is checked byte for byte against the worked example in RFC 8291 Appendix A, and against a decrypting test browser. The VAPID token is checked by verifying its signature. A test push service over TLS checks the whole path, including removing a subscription the service reports gone (410).
 - Approved and added to the spec: `GET /api/push/subscriptions` (devices without their endpoints) and `POST /api/push/unsubscribe` by `id`, so an old phone can be removed from the laptop.
 - Verified in headless Chromium: the Reminders screen at both widths; saving a time and a toggle (they reach the server and other devices through sync); the browser's zone adopted on opening Reminders; the service worker showing a reminder fed through the DevTools protocol, with title, body, tag, icon and the status-bar badge. Ungoogled Chromium has no push service, so turning reminders on there shows "This browser cannot get reminders."
-- **Not verified, and the "Done when" needs it:** a real Android phone, with the app installed and closed, over HTTPS. Deploy first (Phase 5 has the deploy files), turn reminders on in Reminders, use "Send a test now", then wait for 08:00. Tapping the notification should open Today.
+- Verified by the owner on a real phone over HTTPS (5 October 2026): the phone setup for reminders works, which the "Done when" needed.
 - `notificationclick` uses the open window if there is one, otherwise opens `/`. It only ever opens paths of this app.
 - Found while testing: a failed browser subscribe threw a browser error the screen did not show; it now explains itself. Long toast messages wrap instead of being cut off.
 
@@ -169,6 +169,16 @@ Notes:
 - "Loading" means the first sync after logging in has not finished (a `loaded` flag in IndexedDB). Devices that synced before the flag existed count as loaded.
 - The phone's Plan gained the plus button the mockups draw, opening the existing New task form in a sheet; without it the phone could not add a dated task from Plan.
 - Verified in headless Chromium against the built binary, at 390 and 1280 px: Set up with its errors, Log in, a wrong pair, the session-ended notice, both change dialogs (a wrong current passphrase, then success, after which Sessions listed only this browser), dark and light themes, the offline and failed-sync banners with Retry and "Back online. Synced.", every empty state on a fresh install, the skeleton while the first sync is held back, the error block when it fails and "Try again", a project that no longer exists, a 26 MB upload, and every shortcut. A script over every screen in both themes found no unnamed buttons, unlabelled fields, targets under 44 px or text under 4.5:1. Not verified: a real screen reader, and a real phone.
+
+## After release: several people (owner's request, 6 October 2026)
+
+- [x] A planner per person in `data/users/<id>/`, the existing schema unchanged apart from `0004_users.sql`; an install from before moves into the owner's folder on start, keeping its sessions.
+- [x] Cookies name their planner; login finds the person by username, with one limit across everyone and an unknown username timed like a wrong passphrase.
+- [x] The owner adds people with a one-time passphrase and removes them (their folder moves to `removed/`); usernames are unique across everyone.
+- [x] "Choose your passphrase" covers the app until an added person replaces the one-time passphrase.
+- [x] Everything else is per person: settings, theme, calendar link, reminders, sessions, the backup switch (each into `<backup folder>/<id>`).
+- [x] A device that held someone else's planner empties itself before syncing the new person, so nothing crosses between accounts.
+- Verified: Go tests for each rule above; in headless Chromium against a copy of a v0.1.0 install (owner and a task), the move, the old cookie, adding Sam, Sam's first login and passphrase, Sam not seeing the owner's task, Sam without the People tab, removing Sam, at 390 and 1280 px.
 
 ## Known risks
 

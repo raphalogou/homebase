@@ -21,7 +21,7 @@ Usage:
 Commands:
   serve              Start the server (Ctrl-C stops it)
   hash-passphrase    Read a passphrase twice and print HOMEBASE_PASSPHRASE_HASH
-  backup <dir>       Copy the database, uploaded files and push key into <dir>
+  backup <dir>       Copy everyone's database and files, and the push key, into <dir>
   version            Print the version and build commit
   help               Show this help
 
@@ -159,7 +159,7 @@ func joinKey(group, key string) string {
 type summary struct {
 	Addr, BaseURL, DataDir, BackupDir string
 	BackupInterval                    time.Duration
-	Backups, NeedsSetup               bool
+	People                            int
 }
 
 func printSummary(w io.Writer, p palette, s summary) {
@@ -174,15 +174,14 @@ func printSummary(w io.Writer, p palette, s summary) {
 		line("Public", "not set "+p.c(dim)+"(HOMEBASE_BASE_URL; the calendar link uses the address it is opened at)"+p.c(reset))
 	}
 	line("Data", s.DataDir)
-	if s.Backups {
-		line("Backups", fmt.Sprintf("every %s to %s", every(s.BackupInterval), s.BackupDir))
-	} else {
-		line("Backups", "off "+p.c(dim)+"(turn on in Settings, Backups)"+p.c(reset))
-	}
-	if s.NeedsSetup {
-		line("Account", p.c(yellow)+"none yet: open the address above to set it up"+p.c(reset))
-	} else {
-		line("Account", "ready")
+	line("Backups", fmt.Sprintf("every %s to %s, for each person who turns them on in Settings", every(s.BackupInterval), s.BackupDir))
+	switch s.People {
+	case 0:
+		line("People", p.c(yellow)+"none yet: open the address above to set up the owner"+p.c(reset))
+	case 1:
+		line("People", "1, the owner")
+	default:
+		line("People", fmt.Sprintf("%d", s.People))
 	}
 	_, _ = fmt.Fprintln(w)
 }

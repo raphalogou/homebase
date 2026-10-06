@@ -122,7 +122,7 @@ You need a server with a domain name pointing at it (or Tailscale, see below). R
 
 Then open the address in a browser straight away. The first visit shows **Set up Homebase**, where you choose a username and a passphrase of at least 12 characters; you are then logged in. Until that is done, anyone who reaches the address could do it instead, so do it as soon as the server is up. Both can be changed later in Settings.
 
-To create the account without the browser, for example on a server that is public from the start, put the line from `homebase hash-passphrase` in the settings file before the first start. The account is then created with the username `owner` and that passphrase. An install from before usernames gets the same: log in as `owner` with your passphrase and rename it in Settings. After the account exists the variable is no longer read.
+To create the owner's account without the browser, for example on a server that is public from the start, put the line from `homebase hash-passphrase` in the settings file before the first start. The account is then created with the username `owner` and that passphrase. An install from before usernames gets the same: log in as `owner` with your passphrase and rename it in Settings. After the account exists the variable is no longer read.
 
 ### Versions
 
@@ -159,10 +159,14 @@ sudo systemctl enable --now homebase-backup.timer
 
 ### Restore
 
+Each person's planner is a folder `users/<id>/` in the data folder (`/var/lib/homebase`, or the `homebase-data` volume), and their backups are in `<backup folder>/<id>/`. Each person's Settings, Backups shows their folder, which ends in their id. To restore one person:
+
 1. Stop Homebase (`docker stop homebase` or `sudo systemctl stop homebase`).
-2. In the data folder (`/var/lib/homebase`, or the `homebase-data` volume), delete `homebase.db` and any `homebase.db-wal` and `homebase.db-shm`.
-3. Copy the backup you want in as `homebase.db`, and copy the backup's `files` folder and `vapid-private.pem` over the ones there. Keep the owner as the Homebase user (`homebase`, or `65532` for Docker).
+2. In `users/<id>/`, delete `homebase.db` and any `homebase.db-wal` and `homebase.db-shm`.
+3. Copy the backup you want in as `homebase.db`, and copy the backup's `files` folder over the one there. Keep the owner as the Homebase user (`homebase`, or `65532` for Docker). `vapid-private.pem` is shared by everyone and sits at the top of the data folder and of a full `homebase backup`.
 4. Start Homebase again. Devices sync what changed; anything newer on a device than the backup is sent up again.
+
+A removed person's folder is moved to `removed/<id>-<time>/` in the data folder. To bring them back, stop Homebase, move it back to `users/<id>/`, and start it.
 
 ## Configuration
 
@@ -194,7 +198,7 @@ homebase backup <dir>        # copies the database, files and push key into <dir
 
 ## Known limits
 
-- Single user: one account, with a username and a passphrase.
+- Several people can share a server, each with a private planner; the owner adds and removes them in Settings, People. Nothing is shared between planners.
 - If two devices edit the same task within seconds, the later edit wins whole.
 - Uploading files needs a connection; everything else works offline.
 - Google Calendar refreshes subscribed feeds only every several hours, so changes appear slowly there.

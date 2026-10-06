@@ -23,15 +23,10 @@ import (
 	"homebase/internal/auth"
 	"homebase/internal/backup"
 	"homebase/internal/config"
-	"homebase/internal/db"
-	"homebase/internal/files"
-	"homebase/internal/migrate"
 	"homebase/internal/push"
 	"homebase/internal/sched"
-	"homebase/internal/store"
-	"homebase/internal/syncer"
+	"homebase/internal/tenant"
 	"homebase/internal/webui"
-	"homebase/migrations"
 )
 
 // Set at build time by the Makefile and Dockerfile (-ldflags -X).
@@ -89,7 +84,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 		if err != nil {
 			return err
 		}
-		return backup.Run(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
+		return backup.RunAll(context.Background(), cfg.DataDir, args[1], time.Now(), stdout)
 	case "help", "-h", "--help":
 		_, err := fmt.Fprint(stdout, usage)
 		return err
@@ -109,58 +104,50 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger, out io.Writ
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return fmt.Errorf("create data folder: %w", err)
 	}
-	database, err := db.Open(filepath.Join(cfg.DataDir, "homebase.db"))
-	if err != nil {
-		return err
-	}
-	defer database.Close()
-	if err := migrate.Run(ctx, database, migrations.FS, time.Now); err != nil {
-		return err
-	}
-
-	st := store.NewSQLite(database)
-	sy := syncer.New(st, time.Now)
-	if err := sy.Init(ctx); err != nil {
-		return fmt.Errorf("first-run setup: %w", err)
-	}
-	au := auth.New(st, time.Now)
-	if cfg.PassphraseHash != "" {
-		created, err := au.Bootstrap(ctx, cfg.PassphraseHash)
-		if err != nil {
-			return fmt.Errorf("account from HOMEBASE_PASSPHRASE_HASH: %w", err)
-		}
-		if created {
-			log.Info("account created from HOMEBASE_PASSPHRASE_HASH", "username", auth.DefaultUsername)
-		}
-	}
-	needsSetup, err := au.SetupNeeded(ctx)
-	if err != nil {
-		return err
-	}
 	keys, err := push.LoadOrCreateKeys(cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	sender := push.NewSender(keys, cfg.VAPIDSubject, &http.Client{Timeout: 15 * time.Second}, time.Now)
-	blobs, err := files.New(cfg.DataDir)
+
+	// start runs for each person's planner: their API and their jobs, with
+	// backups into a folder of their own.
+	start := func(ctx context.Context, people *tenant.Registry, t *tenant.Tenant) error {
+		backupDir := filepath.Join(cfg.BackupDir, t.ID)
+		t.Handler = api.Tenant(api.Deps{
+			Log: log, Auth: t.Auth, Sync: t.Sync, Blobs: t.Blobs, UserID: t.ID, People: people,
+			Keys: keys, Sender: sender, BaseURL: cfg.BaseURL,
+			BackupDir: backupDir, BackupInterval: cfg.BackupInterval,
+		})
+		jobLog := log.With("user", t.ID)
+		go sched.Run(ctx, jobLog, t.Sync, t.Sync, t.Blobs, sched.NewReminders(t.Sync, sender, jobLog, time.Now), 30*time.Second)
+		go backup.Loop(ctx, jobLog, func(ctx context.Context) (bool, error) {
+			st, err := t.Sync.GetSettings(ctx)
+			return st.Backups != nil && *st.Backups, err
+		}, t.Dir, backupDir, cfg.BackupInterval)
+		return nil
+	}
+	jobs, stopJobs := context.WithCancel(ctx)
+	defer stopJobs()
+	people, err := tenant.Open(jobs, cfg.DataDir, time.Now, start)
 	if err != nil {
 		return err
 	}
+	defer people.Close()
+
+	if cfg.PassphraseHash != "" && people.Count() == 0 {
+		if _, err := people.Create(true, func(t *tenant.Tenant) error {
+			_, err := t.Auth.Bootstrap(ctx, cfg.PassphraseHash)
+			return err
+		}); err != nil {
+			return fmt.Errorf("account from HOMEBASE_PASSPHRASE_HASH: %w", err)
+		}
+		log.Info("account created from HOMEBASE_PASSPHRASE_HASH", "username", auth.DefaultUsername)
+	}
 
 	srv := &http.Server{
-		Addr: cfg.Addr,
-		Handler: api.New(api.Deps{
-			Log:            log,
-			Auth:           au,
-			Sync:           sy,
-			Blobs:          blobs,
-			Keys:           keys,
-			Sender:         sender,
-			BaseURL:        cfg.BaseURL,
-			BackupDir:      cfg.BackupDir,
-			BackupInterval: cfg.BackupInterval,
-			Web:            webui.Handler(),
-		}),
+		Addr:              cfg.Addr,
+		Handler:           api.New(api.RootDeps{Log: log, People: people, Web: webui.Handler()}),
 		ReadHeaderTimeout: 10 * time.Second,
 		// Generous enough for a 25 MB upload on a slow phone connection.
 		ReadTimeout:  5 * time.Minute,
@@ -169,29 +156,15 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger, out io.Writ
 		ErrorLog:     slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
 
-	jobs, stopJobs := context.WithCancel(ctx)
-	defer stopJobs()
-	reminders := sched.NewReminders(sy, sender, log, time.Now)
-	go sched.Run(jobs, log, sy, sy, blobs, reminders, 30*time.Second)
-	go backup.Loop(jobs, log, func(ctx context.Context) (bool, error) {
-		st, err := sy.GetSettings(ctx)
-		return st.Backups != nil && *st.Backups, err
-	}, cfg.DataDir, cfg.BackupDir, cfg.BackupInterval)
-
 	// Listening first turns a taken port into a clear error before the
 	// summary claims the address.
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("cannot listen on %s (set HOMEBASE_ADDR to another address): %w", cfg.Addr, err)
 	}
-	settings, err := sy.GetSettings(ctx)
-	if err != nil {
-		return err
-	}
 	printSummary(out, p, summary{
 		Addr: cfg.Addr, BaseURL: cfg.BaseURL, DataDir: cfg.DataDir,
-		BackupDir: cfg.BackupDir, BackupInterval: cfg.BackupInterval,
-		Backups: settings.Backups != nil && *settings.Backups, NeedsSetup: needsSetup,
+		BackupDir: cfg.BackupDir, BackupInterval: cfg.BackupInterval, People: people.Count(),
 	})
 	errc := make(chan error, 1)
 	go func() {

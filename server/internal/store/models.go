@@ -112,11 +112,15 @@ type PushSub struct {
 	LastOK    *int64
 }
 
-// Account is the single account. ChangedAt is when the passphrase was set.
+// Account is this database's person. ChangedAt is when the passphrase was
+// set; Owner may add and remove people; MustChange is set for an added
+// person until they choose their own passphrase.
 type Account struct {
 	Username       string
 	PassphraseHash string
 	ChangedAt      int64
+	Owner          bool
+	MustChange     bool
 }
 
 type Session struct {

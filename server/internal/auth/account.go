@@ -37,6 +37,25 @@ func NormalizeUsername(s string) (string, error) {
 type AccountInfo struct {
 	Username            string `json:"username"`
 	PassphraseChangedAt int64  `json:"passphraseChangedAt"`
+	Owner               bool   `json:"owner"`
+	MustChange          bool   `json:"mustChange"`
+}
+
+func info(acc store.Account) AccountInfo {
+	return AccountInfo{Username: acc.Username, PassphraseChangedAt: acc.ChangedAt, Owner: acc.Owner, MustChange: acc.MustChange}
+}
+
+var errTaken = apperr.ForField(apperr.Invalid, "username", "That username is taken.")
+
+func (a *Auth) taken(ctx context.Context, username string) error {
+	if a.Taken == nil {
+		return nil
+	}
+	taken, err := a.Taken(ctx, username)
+	if err == nil && taken {
+		return errTaken
+	}
+	return err
 }
 
 func (a *Auth) account(ctx context.Context) (store.Account, error) {
@@ -64,7 +83,7 @@ func (a *Auth) Account(ctx context.Context) (AccountInfo, error) {
 	if err != nil {
 		return AccountInfo{}, err
 	}
-	return AccountInfo{Username: acc.Username, PassphraseChangedAt: acc.ChangedAt}, nil
+	return info(acc), nil
 }
 
 // SetupNeeded reports whether the account still has to be created.
@@ -90,9 +109,33 @@ func (a *Auth) Bootstrap(ctx context.Context, phc string) (bool, error) {
 			return err
 		}
 		created = true
-		return tx.InsertAccount(store.Account{Username: DefaultUsername, PassphraseHash: phc, ChangedAt: a.now().UnixMilli()})
+		return tx.InsertAccount(store.Account{Username: DefaultUsername, PassphraseHash: phc, ChangedAt: a.now().UnixMilli(), Owner: true})
 	})
 	return created, err
+}
+
+// Create makes the account of a person the owner adds. The passphrase is
+// one-time: they must choose their own before using Homebase.
+func (a *Auth) Create(ctx context.Context, username, passphrase string) (AccountInfo, error) {
+	u, err := NormalizeUsername(username)
+	if err != nil {
+		return AccountInfo{}, err
+	}
+	if err := CheckNewPassphrase(passphrase); err != nil {
+		return AccountInfo{}, apperr.ForField(apperr.Invalid, "passphrase", err.Error())
+	}
+	if err := a.taken(ctx, u); err != nil {
+		return AccountInfo{}, err
+	}
+	phc, err := HashPassphrase(passphrase)
+	if err != nil {
+		return AccountInfo{}, err
+	}
+	acc := store.Account{Username: u, PassphraseHash: phc, ChangedAt: a.now().UnixMilli(), MustChange: true}
+	if err := a.store.Tx(ctx, func(tx store.Tx) error { return tx.InsertAccount(acc) }); err != nil {
+		return AccountInfo{}, err
+	}
+	return info(acc), nil
 }
 
 // Setup creates the account and logs this device in. It works only while no
@@ -127,7 +170,7 @@ func (a *Auth) Setup(ctx context.Context, username, passphrase, addr, label stri
 			}
 			return err
 		}
-		return tx.InsertAccount(store.Account{Username: u, PassphraseHash: phc, ChangedAt: a.now().UnixMilli()})
+		return tx.InsertAccount(store.Account{Username: u, PassphraseHash: phc, ChangedAt: a.now().UnixMilli(), Owner: true})
 	})
 }
 
@@ -163,11 +206,15 @@ func (a *Auth) ChangeUsername(ctx context.Context, username, passphrase, addr st
 		return AccountInfo{}, err
 	}
 	if subtle.ConstantTimeCompare([]byte(u), []byte(acc.Username)) != 1 {
+		if err := a.taken(ctx, u); err != nil {
+			return AccountInfo{}, err
+		}
 		if err := a.store.Tx(ctx, func(tx store.Tx) error { return tx.SetUsername(u) }); err != nil {
 			return AccountInfo{}, err
 		}
 	}
-	return AccountInfo{Username: u, PassphraseChangedAt: acc.ChangedAt}, nil
+	acc.Username = u
+	return info(acc), nil
 }
 
 // ChangePassphrase sets a new passphrase after checking the current one, and
@@ -197,5 +244,6 @@ func (a *Auth) ChangePassphrase(ctx context.Context, token, current, next, addr 
 	if err != nil {
 		return AccountInfo{}, err
 	}
-	return AccountInfo{Username: acc.Username, PassphraseChangedAt: at}, nil
+	acc.ChangedAt, acc.MustChange = at, false
+	return info(acc), nil
 }

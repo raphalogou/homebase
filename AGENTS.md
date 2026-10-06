@@ -4,7 +4,7 @@ Instructions for AI coding agents working on Homebase. Read this file first, the
 
 ## What this is
 
-Homebase is a personal planner for one person, used on an Android phone and a computer. It holds goals, projects and tasks, shows a calm daily view, and sends up to three reminders a day. The aim is that the user does not forget it exists, so every decision favours a short daily ritual over a feature-rich task manager.
+Homebase is a personal planner, used on an Android phone and a computer. One server can hold several people (owner's request, October 2026), each with their own private planner; nothing is shared between them, so every screen is still built for one person. It holds goals, projects and tasks, shows a calm daily view, and sends up to three reminders a day. The aim is that the user does not forget it exists, so every decision favours a short daily ritual over a feature-rich task manager.
 
 ## Principles (these decide close calls)
 

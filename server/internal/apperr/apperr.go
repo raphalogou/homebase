@@ -14,6 +14,7 @@ type Code string
 const (
 	Invalid      Code = "invalid"
 	Unauthorized Code = "unauthorized"
+	Forbidden    Code = "forbidden"
 	NotFound     Code = "not_found"
 	TooLarge     Code = "too_large"
 	RateLimited  Code = "rate_limited"
@@ -26,6 +27,8 @@ func (c Code) Status() int {
 		return http.StatusBadRequest
 	case Unauthorized:
 		return http.StatusUnauthorized
+	case Forbidden:
+		return http.StatusForbidden
 	case NotFound:
 		return http.StatusNotFound
 	case TooLarge:

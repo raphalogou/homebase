@@ -108,6 +108,33 @@ func Last(dir string) (time.Time, bool) {
 	return t, err == nil
 }
 
+// RunAll backs up everyone: each planner in dataDir/users/<id> into
+// dir/<id>, and the push key, which they share, into dir. An install from
+// before several people still has its database at the top and is backed
+// up as before.
+func RunAll(ctx context.Context, dataDir, dir string, now time.Time, out io.Writer) error {
+	if _, err := os.Stat(filepath.Join(dataDir, "homebase.db")); err == nil {
+		return Run(ctx, dataDir, dir, now, out)
+	}
+	users, err := os.ReadDir(filepath.Join(dataDir, "users"))
+	if err != nil {
+		return fmt.Errorf("no planners in %s: %w", dataDir, err)
+	}
+	for _, u := range users {
+		if !u.IsDir() {
+			continue
+		}
+		if err := Run(ctx, filepath.Join(dataDir, "users", u.Name()), filepath.Join(dir, u.Name()), now, out); err != nil {
+			return fmt.Errorf("%s: %w", u.Name(), err)
+		}
+	}
+	err = copyFile(filepath.Join(dataDir, push.KeyFile), filepath.Join(dir, push.KeyFile))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
 // copyFiles copies stored files that the backup does not have yet. They are
 // named by their hash, so one already there is the same file.
 func copyFiles(from, to string) (int, error) {

@@ -12,7 +12,7 @@ Source of truth for the data model, sync protocol and API. If code and this file
 - **Status:** goals and projects: `open | paused | done | dropped`. Tasks: `open | done | dropped`.
 - **Ordering:** `plan_rank` is a float. Dragging sets the rank to the midpoint of the new neighbours; renumber the day when the gap falls below 1e-6.
 - **Limits:** titles 300 chars, notes and note attachments 20,000, files 25 MB.
-- **Errors:** `{"error":{"code","message","field"?}}` with a matching HTTP status. `field` names the request field a message belongs to (`username`, `passphrase`, `current`, `next`), so a form can show it under that field. Codes: `invalid` (400), `unauthorized` (401), `not_found` (404), `too_large` (413), `rate_limited` (429).
+- **Errors:** `{"error":{"code","message","field"?}}` with a matching HTTP status. `field` names the request field a message belongs to (`username`, `passphrase`, `current`, `next`), so a form can show it under that field. Codes: `invalid` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `too_large` (413), `rate_limited` (429).
 
 ## 2. Schema (`server/migrations/0001_init.sql`)
 
@@ -165,7 +165,7 @@ CREATE TABLE account (
 );
 ```
 
-The single account. It is not synced. It is created by `POST /api/setup` on a fresh install, or, on an install from before usernames, from `HOMEBASE_PASSPHRASE_HASH` with the username `owner` the first time the server starts. Once the row exists the variable is ignored, so a passphrase changed in Settings survives a restart.
+This database's person. It is not synced. The first person, the owner, is created by `POST /api/setup` on a fresh install, or from `HOMEBASE_PASSPHRASE_HASH` with the username `owner` the first time the server starts with nobody. Once anyone exists the variable is ignored, so a passphrase changed in Settings survives a restart.
 
 ### `server/migrations/0003_backups.sql`
 
@@ -173,7 +173,17 @@ The single account. It is not synced. It is created by `POST /api/setup` on a fr
 ALTER TABLE settings ADD COLUMN backups INTEGER NOT NULL DEFAULT 0 CHECK (backups IN (0, 1));
 ```
 
-The daily backup switch in Settings, off until chosen. While on, the server runs the same copy as `homebase backup` into `HOMEBASE_BACKUP_DIR`, or `backups` in the data folder, whenever the newest `homebase-*.db` there is older than `HOMEBASE_BACKUP_INTERVAL` (whole days like `7d` or a Go duration like `12h`, at least `1h`, default `1d`) or missing (checked each minute, so the first follows the switch and a missed one follows a restart). Old copies are not removed.
+The daily backup switch in Settings, off until chosen. While on, the server runs the same copy as `homebase backup` into `HOMEBASE_BACKUP_DIR`, or `backups` in the data folder, whenever the newest `homebase-*.db` there is older than `HOMEBASE_BACKUP_INTERVAL` (whole days like `7d` or a Go duration like `12h`, at least `1h`, default `1d`) or missing (checked each minute, so the first follows the switch and a missed one follows a restart). Old copies are not removed. Each person has their own switch and their own folder, `<backup folder>/<planner id>`.
+
+### `server/migrations/0004_users.sql`
+
+```sql
+ALTER TABLE account ADD COLUMN owner INTEGER NOT NULL DEFAULT 0 CHECK (owner IN (0, 1));
+ALTER TABLE account ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0 CHECK (must_change IN (0, 1));
+UPDATE account SET owner = 1;
+```
+
+Several people, each with a planner of their own. A planner is a folder `data/users/<id>/` (16 hex characters, random) holding this whole schema and its `files/`, so sync, revisions and rules are per person with no change. The push key, `vapid-private.pem`, stays at the top of the data folder and is shared. The account row of a planner is its person: `owner` for the one who may add and remove people, `must_change` for someone added with a one-time passphrase until they choose their own (setting a passphrase clears it). An install from before this keeps its database at `data/homebase.db`; on start the server moves it, with `files/`, into a new planner folder, and that account becomes the owner. Usernames are unique across planners, without case. Removing a person moves their folder to `data/removed/<id>-<UTC time>/`; moving it back and restarting undoes it.
 
 ## 3. Sync protocol
 
@@ -211,14 +221,17 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `GET /api/setup` | none, no cookie | `{needed}`: true until the account exists. |
-| `POST /api/setup` | `{username, passphrase}` | 204 and the session cookie. Works only while no account exists (`invalid` afterwards). Shares the login limit. |
-| `POST /api/login` | `{username, passphrase}` | 204 and cookie `hb_session` (HttpOnly, Secure, SameSite=Lax, 180 days, sliding). A wrong pair is 401 "That username or passphrase did not match.", never saying which. Five failures per 10 min per address, then 429. |
-| `GET /api/account` | none | `{username, passphraseChangedAt}` |
-| `PUT /api/account/username` | `{username, passphrase}` | `{username, passphraseChangedAt}`. The passphrase confirms the change. |
-| `PUT /api/account/passphrase` | `{current, next}` | `{username, passphraseChangedAt}`. Logs out every other session; this one stays. |
+| `GET /api/setup` | none, no cookie | `{needed}`: true until the first person exists. |
+| `POST /api/setup` | `{username, passphrase}` | 204 and the session cookie. Creates the owner; works only while nobody exists (`invalid` afterwards). Shares the login limit. |
+| `POST /api/login` | `{username, passphrase}` | 204 and cookie `hb_session` (HttpOnly, Secure, SameSite=Lax, 180 days, sliding), whose value is `<planner id>.<token>` so a request finds its planner; a cookie from before several people has no id and belongs to the owner. A wrong pair, or a username nobody has, is 401 "That username or passphrase did not match.", never saying which, and an unknown username takes as long as a wrong passphrase. Five failures per 10 min per address, counted across everyone, then 429. |
+| `GET /api/account` | none | `{username, passphraseChangedAt, owner, mustChange}` |
+| `PUT /api/account/username` | `{username, passphrase}` | The account, as `GET`. The passphrase confirms the change; a username someone else has is `invalid` "That username is taken." |
+| `PUT /api/account/passphrase` | `{current, next}` | The account, as `GET`. Logs out every other session; this one stays. Clears `mustChange`. |
 | `POST /api/logout` | none | 204 |
-| `GET /api/me` | none | `{tz, weekStart, rev, username}` |
+| `GET /api/me` | none | `{tz, weekStart, rev, username, userId, owner, mustChange}`. `userId` is the planner id: a device that held someone else's planner empties itself before syncing. |
+| `GET /api/people` | none | Owner only (`forbidden` otherwise). `[{id, username, owner, mustChange}]`, the owner first. |
+| `POST /api/people` | `{username, passphrase}` | Owner only. Adds a person with a one-time passphrase (`mustChange` true) and returns them as listed. A taken username or a short passphrase is `invalid` with its `field`. |
+| `POST /api/people/remove` | `{id}` | Owner only. 204; their sessions end at once. The owner cannot be removed (`invalid`). |
 | `GET /api/sync?since=N&limit=500` | none | `{rev, more, goals[], projects[], tasks[], repeats[], attachments[], reminders[]}` |
 | `POST /api/sync` | `{base, ops[]}` | `{rev, applied[], rejected[{id,reason}], changes}` |
 | `POST /api/promote` | `{taskId, goalId?}` | `{project, removedTaskId}`. One transaction: new project from an Inbox task, notes and attachments moved, task tombstoned. The project takes the task's title, notes and `due`; without `goalId` it keeps the task's goal. A task already in a project is `invalid`. |
@@ -235,7 +248,7 @@ JSON over HTTPS with a session cookie. Every state-changing request needs `Conte
 | `POST /api/push/unsubscribe` | `{endpoint}` or `{id}` | 204. The device itself sends its endpoint; another device removes it by `id`. Removing one that is not there is fine. |
 | `GET /api/push/subscriptions` | none | `[{id, label, createdAt, lastOk}]`. `id` is the first 16 bytes of the endpoint's SHA-256 in hex, so a browser can find itself; the endpoint is never sent back, since it works like a password for the push service. |
 | `POST /api/push/test` | none | `{sent, failed}` |
-| `GET /calendar/{token}.ics` | none, no cookie | iCalendar feed. 404 for a wrong token. |
+| `GET /calendar/{token}.ics` | none, no cookie | iCalendar feed of the planner whose link it is. 404 for a wrong token. |
 | `POST /api/calendar/rotate` | none | `{url}`. The old link stops at once. |
 | `GET /healthz` | none | `ok`, no auth |
 
@@ -303,7 +316,7 @@ All of these live on the server so every device sees the same result.
 
 ## 7. Security
 
-- One account: a username and a passphrase, stored only as an argon2id hash in the `account` table.
+- One account per person, in their own planner: a username and a passphrase, stored only as an argon2id hash in its `account` table. Nobody, the owner included, can read another person's planner through the API.
 - **Username:** 3 to 32 characters from `a-z 0-9 . _ -`, compared without case and stored in lowercase.
 - **Passphrase:** at least 12 characters, at most 1000, no composition rules. Requests longer than 4096 bytes are refused before hashing.
 - Changing the username or the passphrase needs the current passphrase. Wrong passphrases on setup, login and both changes count toward the same limit of five per 10 minutes per address.

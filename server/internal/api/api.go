@@ -15,13 +15,18 @@ import (
 	"homebase/internal/push"
 	"homebase/internal/sched"
 	"homebase/internal/syncer"
+	"homebase/internal/tenant"
 )
 
-// Deps are the services the handlers use.
+// Deps are the services one person's handlers use.
 type Deps struct {
 	Log  *slog.Logger
 	Auth *auth.Auth
 	Sync *syncer.Syncer
+	// UserID names this person's planner; People is everyone, for the
+	// owner's list in Settings.
+	UserID string
+	People *tenant.Registry
 	// Blobs holds uploaded files.
 	Blobs *files.Blobs
 	// Keys and Sender are for Web Push.
@@ -32,27 +37,20 @@ type Deps struct {
 	// BackupDir and BackupInterval are shown in Settings.
 	BackupDir      string
 	BackupInterval time.Duration
-	// Web serves the built web app for every path that is not an API route.
-	Web http.Handler
 }
 
 type server struct {
 	Deps
 }
 
-// New returns the root handler.
-func New(d Deps) http.Handler {
+// Tenant returns the handler for one person's API: everything behind a
+// session, and their calendar feed. New routes requests to it.
+func Tenant(d Deps) http.Handler {
 	s := &server{Deps: d}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", handleHealthz)
-
-	mux.HandleFunc("GET /api/setup", s.handleSetupNeeded)
-	mux.Handle("POST /api/setup", s.writeChecks(http.HandlerFunc(s.handleSetup)))
-	mux.Handle("POST /api/login", s.writeChecks(http.HandlerFunc(s.handleLogin)))
 	mux.Handle("GET /api/account", s.session(http.HandlerFunc(s.handleAccount)))
 	mux.Handle("PUT /api/account/username", s.writeChecks(s.session(http.HandlerFunc(s.handleChangeUsername))))
 	mux.Handle("PUT /api/account/passphrase", s.writeChecks(s.session(http.HandlerFunc(s.handleChangePassphrase))))
-	mux.Handle("POST /api/logout", s.writeChecks(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /api/me", s.session(http.HandlerFunc(s.handleMe)))
 	mux.Handle("GET /api/sync", s.session(http.HandlerFunc(s.handlePull)))
 	mux.Handle("POST /api/sync", s.writeChecks(s.session(http.HandlerFunc(s.handlePush))))
@@ -72,13 +70,15 @@ func New(d Deps) http.Handler {
 	mux.Handle("POST /api/calendar/rotate", s.writeChecks(s.session(http.HandlerFunc(s.handleRotateCalendar))))
 	mux.Handle("GET /api/sessions", s.session(http.HandlerFunc(s.handleSessions)))
 	mux.Handle("POST /api/sessions/revoke", s.writeChecks(s.session(http.HandlerFunc(s.handleRevokeSession))))
+	mux.Handle("GET /api/people", s.session(s.owner(http.HandlerFunc(s.handlePeople))))
+	mux.Handle("POST /api/people", s.writeChecks(s.session(s.owner(http.HandlerFunc(s.handleAddPerson)))))
+	mux.Handle("POST /api/people/remove", s.writeChecks(s.session(s.owner(http.HandlerFunc(s.handleRemovePerson)))))
 	mux.HandleFunc("GET /calendar/{file}", s.handleCalendar)
 
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, apperr.New(apperr.NotFound, "No such endpoint."))
 	})
-	mux.Handle("/", d.Web)
-	return securityHeaders(logRequests(d.Log, mux))
+	return mux
 }
 
 func handleHealthz(w http.ResponseWriter, _ *http.Request) {
