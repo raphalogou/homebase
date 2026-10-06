@@ -17,6 +17,7 @@ import {
   SettingsIcon,
   TodayIcon,
 } from "./icons";
+import { Wordmark } from "./logo";
 import { PickDialog } from "./pick-dialog";
 import { RemindersDialog } from "./reminders-dialog";
 import { Shortcuts } from "./shortcuts";
@@ -83,14 +84,6 @@ function RailKey({ to }: { to: string }) {
   ) : null;
 }
 
-export function Wordmark() {
-  return (
-    <p className="text-xl font-bold tracking-[-0.01em]">
-      <span className="mark">Homebase</span>
-    </p>
-  );
-}
-
 export function AppShell() {
   const inbox = useInbox().length;
   return (
@@ -101,7 +94,7 @@ export function AppShell() {
           className="sticky top-0 hidden h-dvh w-[240px] shrink-0 flex-col border-r border-line px-4 pt-10 min-[900px]:flex"
         >
           <div className="mb-8 px-3">
-            <Wordmark />
+            <Wordmark className="text-xl" />
           </div>
           <ul className="flex flex-col gap-1">
             {[...NAV, ...RAIL_EXTRA].map(({ to, label, icon: Icon }) => (

@@ -39,8 +39,9 @@
   --panel: #15191a;
   --panel-text: #f2f3ef;
   --panel-muted: #c4c9c3;
-  /* The panel's wordmark keeps the light theme's yellow, since the panel never changes. */
-  --panel-mark: #f2e94e;
+  /* The logo's highlight, the light theme's yellow in both themes, so the
+     mark looks the same wherever it sits. */
+  --logo-yellow: #f2e94e;
   --notif-bg: #1b1c1f;
   --notif-card: #2e3034;
   --veil: rgb(21 25 26 / 0.3);
@@ -111,7 +112,7 @@
   --color-panel: var(--panel);
   --color-panel-text: var(--panel-text);
   --color-panel-muted: var(--panel-muted);
-  --color-panel-mark: var(--panel-mark);
+  --color-logo-yellow: var(--logo-yellow);
   --color-notif-bg: var(--notif-bg);
   --color-notif-card: var(--notif-card);
   --color-veil: var(--veil);
@@ -146,7 +147,7 @@
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
 }
 
-/* The highlighter: only for today's picks, the wordmark and the notification letter. */
+/* The highlighter: only for today's picks (the logo has its own yellow, --logo-yellow). */
 @utility mark {
   box-shadow: inset 0 -0.5em 0 var(--highlight);
   color: var(--highlight-text);

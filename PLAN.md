@@ -77,7 +77,7 @@ Notes:
 - Not verified here: Lighthouse (no Chrome on this machine), long-press drag on a touch screen, mouse dragging of the grip, and a real Android phone. The manifest and worker meet Chrome's installability rules on inspection (name, 192 and 512 px icons, maskable icon, standalone, start URL, a worker with a fetch handler).
 - Login screen designed as approved: the same top-aligned column as the other screens.
 - UI primitives use Base UI (`@base-ui/react`): Dialog for the bottom sheet, ToggleGroup for the segmented control. Selects are native, which suits phones best. Icons are inline SVG; lucide is not installed.
-- The app icon is a roof over three lines with the first highlighted (owner's choice, Logo A); `web/public/icon.svg` is the source of the PNGs.
+- The logo is the owner's v2 drawing: a roof over three rounded lines, the first in the highlighter yellow, beside the wordmark at the same height; `web/public/icon.svg` is the source of the PNGs and the notification badge.
 - Promote uses `/api/promote` when online with an empty outbox; otherwise it queues the same change as ordinary ops (new project, attachments moved, task deleted), which the server also applies in one transaction.
 - Deferred to their phases: the Weekly review and Reminders rail items, Today's review link (Phase 5), and the Tasks/Projects switch on Plan (Phase 3). Goal creation has no screen yet (Phase 6), so the Inbox Goal button only lists existing goals.
 - The service worker serves the cached shell first, so a new build shows on the second open after a deploy.
