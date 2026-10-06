@@ -18,7 +18,7 @@ test("shortcutFor maps the single keys", () => {
   assert.deepEqual(shortcutFor(press("p")), { kind: "go", to: "/plan" });
   assert.deepEqual(shortcutFor(press("g")), { kind: "go", to: "/goals" });
   assert.deepEqual(shortcutFor(press("r")), { kind: "go", to: "/review" });
-  assert.deepEqual(shortcutFor(press("s")), { kind: "modal", name: "settings" });
+  assert.deepEqual(shortcutFor(press("s")), { kind: "go", to: "/settings" });
   assert.deepEqual(shortcutFor(press("?")), { kind: "help" });
   assert.equal(shortcutFor(press("x")), null);
   assert.equal(shortcutFor(press("Escape")), null);

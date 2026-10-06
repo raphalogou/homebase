@@ -19,7 +19,6 @@ import {
 } from "./icons";
 import { PickDialog } from "./pick-dialog";
 import { RemindersDialog } from "./reminders-dialog";
-import { SettingsDialog } from "./settings-dialog";
 import { Shortcuts } from "./shortcuts";
 import { SyncBanner, SyncRailLine } from "./sync-banner";
 import { TaskPanel, TaskSheet } from "./task-editor";
@@ -59,19 +58,17 @@ function Badge({ count, className }: { count: number; className?: string }) {
 const railItem =
   "flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px] font-medium hover:bg-soft";
 
-/** A rail button that opens a modal (?settings=1); filled while it is open. */
+/** A rail button that opens a modal (?reminders=1); filled while it is open. */
 function RailModal({ name, label, Icon }: { name: string; label: string; Icon: NavItem["icon"] }) {
   const [view, open] = useModal(name);
   return (
     <button
       type="button"
-      aria-keyshortcuts={keyFor(name)?.toLowerCase()}
       onClick={() => open("1")}
       className={cn(railItem, "text-left", view && "bg-soft font-semibold")}
     >
       <Icon size={20} />
       <span className="flex-1 whitespace-nowrap">{label}</span>
-      <RailKey to={name} />
     </button>
   );
 }
@@ -128,7 +125,15 @@ export function AppShell() {
           </ul>
           {/* DESIGN.md: Reminders sits at the bottom of the rail; Settings (approved) just above. */}
           <div className="mt-auto mb-8 flex flex-col gap-1">
-            <RailModal name="settings" label="Settings" Icon={SettingsIcon} />
+            <NavLink
+              to="/settings"
+              aria-keyshortcuts={keyFor("/settings")?.toLowerCase()}
+              className={({ isActive }) => cn(railItem, isActive && "bg-soft font-semibold")}
+            >
+              <SettingsIcon size={20} />
+              <span className="flex-1 whitespace-nowrap">Settings</span>
+              <RailKey to="/settings" />
+            </NavLink>
             <RailModal name="reminders" label="Reminders" Icon={RemindersIcon} />
             <ThemeToggle />
             <SyncRailLine />
@@ -174,7 +179,6 @@ export function AppShell() {
 
         <TaskSheet />
         <PickDialog />
-        <SettingsDialog />
         <FirstPassphrase />
         <RemindersDialog />
         <Toaster />

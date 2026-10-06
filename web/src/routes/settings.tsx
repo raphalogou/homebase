@@ -1,9 +1,17 @@
-import { Tabs } from "@base-ui/react/tabs";
 import { type FormEvent, useId, useMemo, useState } from "react";
-import { ACCOUNT_VIEWS } from "@/components/account-forms";
+import { Link, Navigate, NavLink, useParams } from "react-router";
+import { PassphraseForm, UsernameForm } from "@/components/account-forms";
+import { Columns } from "@/components/app-shell";
 import { PassphraseField, TextField } from "@/components/form-field";
-import { CheckIcon, ExternalIcon, LogOutIcon, NoticeIcon } from "@/components/icons";
-import { Empty } from "@/components/section";
+import {
+  BackIcon,
+  CheckIcon,
+  ExternalIcon,
+  LogOutIcon,
+  NextIcon,
+  NoticeIcon,
+} from "@/components/icons";
+import { Empty, ScreenTitle } from "@/components/section";
 import { useShowShortcuts } from "@/components/shortcuts";
 import { InlineError, SkeletonRows } from "@/components/states";
 import { useNotify } from "@/components/toaster";
@@ -22,13 +30,13 @@ import {
   useSessions,
   useSettingsActions,
 } from "@/data/settings";
-import type { SessionInfo } from "@/data/types";
+import type { Person, SessionInfo } from "@/data/types";
 import { USERNAME_HINT } from "@/lib/account";
 import { changedOn } from "@/lib/dates";
-import { useModal } from "@/lib/modal";
 import { setTheme, type Theme, useTheme } from "@/lib/theme";
 import { labelFromUA } from "@/lib/ua";
 import { useIsDesktop } from "@/lib/use-media";
+import { cn } from "@/lib/utils";
 import { COMMIT, REPOSITORY, VERSION } from "@/lib/version";
 
 function ago(ms: number): string {
@@ -40,7 +48,7 @@ function ago(ms: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-const TABS = [
+const SECTIONS = [
   { value: "time", label: "Time and week" },
   { value: "calendar", label: "Calendar" },
   { value: "backups", label: "Backups" },
@@ -50,52 +58,24 @@ const TABS = [
   { value: "about", label: "About" },
 ] as const;
 
-type Tab = (typeof TABS)[number]["value"];
-type Change = keyof typeof ACCOUNT_VIEWS;
+type Section = (typeof SECTIONS)[number]["value"];
 
-const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v);
-const isChange = (v: string | null): v is Change => v === "username" || v === "passphrase";
-
-const tabClass =
-  "flex min-h-11 shrink-0 items-center rounded-md px-3 text-left text-[15px] font-medium whitespace-nowrap hover:bg-soft data-active:bg-soft data-active:font-semibold focus-visible:outline-offset-[-2px]";
-
-// Approved design: a modal over the current screen with a tab for each part:
-// Time and week, Calendar, Backups, Account, Sessions, About (?settings=calendar; "1" is the
-// first). The tabs are a column on desktop and a scrolling row on the phone.
-// Changing the username or passphrase swaps the content for that form
-// (?settings=username), with a back button to the Account tab; so does
-// removing a person (?settings=remove-<id>), back to the People tab.
-export function SettingsDialog() {
-  const [param, setView] = useModal("settings");
+// Approved design (DESIGN.md "Settings"): a screen like the others. On
+// desktop the sections are a nav at the left of the content
+// (/settings/account); on the phone /settings lists them and each opens on
+// its own, with a link back. Changing the username or passphrase and
+// removing a person open a dialog, a sheet on the phone.
+export default function Settings() {
+  const { section: param } = useParams();
   const desktop = useIsDesktop();
   const showShortcuts = useShowShortcuts();
-  const { logout } = useAuth();
   const notify = useNotify();
-  const change = isChange(param) ? param : null;
   const { store } = useData();
   useVersion();
   const owner = store.me?.owner === true;
-  // People is the owner's alone; anyone else asking for it gets the first tab.
-  const tabs = TABS.filter((t) => owner || t.value !== "people");
-  const asked: Tab | null = param === "1" ? "time" : isTab(param) ? param : null;
-  const tab: Tab | null = asked === "people" && !owner ? "time" : asked;
-  const account = change ? ACCOUNT_VIEWS[change] : null;
-  const removeId = owner && param?.startsWith("remove-") ? param.slice("remove-".length) : null;
-  // Leaving a swapped view puts focus back on its tab, not on the page.
-  const returnTo = (t: Tab) => {
-    setView(t, true);
-    requestAnimationFrame(() =>
-      document.querySelector<HTMLElement>("[role=dialog] [role=tab][data-active]")?.focus(),
-    );
-  };
-  const back = () => returnTo("account");
-  const toPeople = () => returnTo("people");
-  const close = () => setView(null);
-  const swapped = account
-    ? { title: account.title, back }
-    : removeId
-      ? { title: "Remove a person", back: toPeople }
-      : null;
+  // People is the owner's alone.
+  const sections = SECTIONS.filter((s) => owner || s.value !== "people");
+  const section = sections.find((s) => s.value === param);
 
   async function run(fn: () => Promise<unknown>, done?: string) {
     try {
@@ -107,95 +87,121 @@ export function SettingsDialog() {
     }
   }
 
-  return (
-    <ResponsiveDialog
-      open={tab !== null || change !== null || removeId !== null}
-      onOpenChange={(o) => !o && close()}
-      title={swapped?.title ?? "Settings"}
-      description={account?.description}
-      width={swapped ? 560 : 760}
-      back={swapped ? { label: "Back to Settings", onClick: swapped.back } : undefined}
-    >
-      {removeId ? (
-        <RemovePerson id={removeId} onDone={toPeople} />
-      ) : account ? (
-        <account.Form
-          onClose={back}
-          onSaved={() =>
-            notify({
-              title:
-                change === "passphrase"
-                  ? "Passphrase saved. Other devices were logged out."
-                  : "Username saved",
-              icon: CheckIcon,
-            })
-          }
-        />
-      ) : (
-        tab && (
-          <Tabs.Root
-            value={tab}
-            onValueChange={(v: Tab) => setView(v, true)}
-            orientation={desktop ? "vertical" : "horizontal"}
-            className="flex flex-col gap-6 min-[900px]:min-h-[440px] min-[900px]:flex-row min-[900px]:gap-8"
-          >
-            <div className="flex shrink-0 flex-col min-[900px]:w-44">
-              <Tabs.List className="-mx-6 flex gap-1 overflow-x-auto px-6 [scrollbar-width:none] min-[900px]:mx-0 min-[900px]:flex-col min-[900px]:px-0">
-                {tabs.map((t) => (
-                  <Tabs.Tab key={t.value} value={t.value} className={tabClass}>
-                    {t.label}
-                  </Tabs.Tab>
+  if (param && !section) return <Navigate to="/settings" replace />;
+  if (!section) {
+    if (desktop) return <Navigate to="/settings/time" replace />;
+    return (
+      <Columns
+        main={
+          <>
+            <ScreenTitle>Settings</ScreenTitle>
+            <nav aria-label="Settings" className="mt-6">
+              <ul>
+                {sections.map((s) => (
+                  <li key={s.value} className="border-t border-line">
+                    <Link
+                      to={`/settings/${s.value}`}
+                      className="flex min-h-14 items-center justify-between text-[17px]"
+                    >
+                      {s.label}
+                      <NextIcon size={20} className="text-muted-foreground" />
+                    </Link>
+                  </li>
                 ))}
-              </Tabs.List>
-              {desktop && (
-                <Button
-                  variant="text"
-                  className="mt-auto self-start"
-                  onClick={() => {
-                    close();
-                    showShortcuts();
-                  }}
+              </ul>
+            </nav>
+          </>
+        }
+      />
+    );
+  }
+
+  const body = <SectionBody section={section.value} run={run} />;
+  if (!desktop) {
+    return (
+      <Columns
+        main={
+          <>
+            <Link
+              to="/settings"
+              className="-ml-2.5 inline-flex min-h-11 items-center gap-0.5 pr-2 font-semibold"
+            >
+              <BackIcon size={24} />
+              Settings
+            </Link>
+            <ScreenTitle className="mt-2">{section.label}</ScreenTitle>
+            <div className="mt-6">{body}</div>
+          </>
+        }
+      />
+    );
+  }
+  return (
+    <Columns
+      main={
+        <>
+          <ScreenTitle>Settings</ScreenTitle>
+          <div className="mt-10 flex gap-12">
+            <nav aria-label="Settings" className="flex w-44 shrink-0 flex-col gap-1">
+              {sections.map((s) => (
+                <NavLink
+                  key={s.value}
+                  to={`/settings/${s.value}`}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex min-h-11 items-center rounded-md px-3 text-[15px] font-medium hover:bg-soft",
+                      isActive && "bg-soft font-semibold",
+                    )
+                  }
                 >
-                  Keyboard shortcuts
-                </Button>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <Tabs.Panel value="time">
-                <TimeAndWeek />
-              </Tabs.Panel>
-              <Tabs.Panel value="calendar">
-                <Calendar run={run} />
-              </Tabs.Panel>
-              <Tabs.Panel value="backups">
-                <Backups run={run} />
-              </Tabs.Panel>
-              <Tabs.Panel value="account">
-                <Account onChange={(v) => setView(v)} />
-              </Tabs.Panel>
-              <Tabs.Panel value="sessions">
-                <Sessions run={run} />
-                <div className="mt-8 border-t border-line pt-6">
-                  <Button variant="secondary" onClick={() => void logout()}>
-                    <LogOutIcon size={20} />
-                    Log out of this device
-                  </Button>
-                </div>
-              </Tabs.Panel>
-              {owner && (
-                <Tabs.Panel value="people">
-                  <People onRemove={(id) => setView(`remove-${id}`)} />
-                </Tabs.Panel>
-              )}
-              <Tabs.Panel value="about">
-                <About />
-              </Tabs.Panel>
-            </div>
-          </Tabs.Root>
-        )
-      )}
-    </ResponsiveDialog>
+                  {s.label}
+                </NavLink>
+              ))}
+              <Button variant="text" className="mt-6 self-start" onClick={showShortcuts}>
+                Keyboard shortcuts
+              </Button>
+            </nav>
+            <section aria-labelledby="settings-section" className="min-w-0 flex-1">
+              <h2 id="settings-section" className="mb-4 text-[22px]/[1.2] font-bold">
+                {section.label}
+              </h2>
+              {body}
+            </section>
+          </div>
+        </>
+      }
+    />
   );
+}
+
+function SectionBody({ section, run }: { section: Section; run: Run }) {
+  const { logout } = useAuth();
+  switch (section) {
+    case "time":
+      return <TimeAndWeek />;
+    case "calendar":
+      return <Calendar run={run} />;
+    case "backups":
+      return <Backups run={run} />;
+    case "account":
+      return <Account />;
+    case "sessions":
+      return (
+        <>
+          <Sessions run={run} />
+          <div className="mt-8 border-t border-line pt-6">
+            <Button variant="secondary" onClick={() => void logout()}>
+              <LogOutIcon size={20} />
+              Log out of this device
+            </Button>
+          </div>
+        </>
+      );
+    case "people":
+      return <People />;
+    case "about":
+      return <About />;
+  }
 }
 
 type Run = (fn: () => Promise<unknown>, done?: string) => Promise<void>;
@@ -409,10 +415,13 @@ function Backups({ run }: { run: Run }) {
   );
 }
 
-function People({ onRemove }: { onRemove: (id: string) => void }) {
+function People() {
   const [people, reload] = usePeople();
   const actions = useSettingsActions();
   const notify = useNotify();
+  // The dialog keeps showing who it was opened for while it closes.
+  const [removing, setRemoving] = useState<Person | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [username, setUsername] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
@@ -460,33 +469,43 @@ function People({ onRemove }: { onRemove: (id: string) => void }) {
         <ul className="mt-4">
           {people.data.map((p) => (
             <li key={p.id} className="flex min-h-16 items-center gap-3 border-t border-line py-2.5">
-              {
-                <>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[17px]">{p.username}</p>
-                    <p className="text-[13px] text-muted-foreground">
-                      {p.owner
-                        ? "Owner"
-                        : p.mustChange
-                          ? "Has not chosen a passphrase yet"
-                          : "Member"}
-                    </p>
-                  </div>
-                  {!p.owner && (
-                    <Button
-                      variant="text"
-                      aria-label={`Remove ${p.username}`}
-                      onClick={() => onRemove(p.id)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </>
-              }
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[17px]">{p.username}</p>
+                <p className="text-[13px] text-muted-foreground">
+                  {p.owner ? "Owner" : p.mustChange ? "Has not chosen a passphrase yet" : "Member"}
+                </p>
+              </div>
+              {!p.owner && (
+                <Button
+                  variant="text"
+                  aria-label={`Remove ${p.username}`}
+                  onClick={() => {
+                    setRemoving(p);
+                    setConfirming(true);
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       )}
+      <ResponsiveDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={removing ? `Remove ${removing.username}?` : "Remove"}
+      >
+        {removing && (
+          <RemovePerson
+            person={removing}
+            onDone={(removed) => {
+              setConfirming(false);
+              if (removed) reload();
+            }}
+          />
+        )}
+      </ResponsiveDialog>
       <form
         onSubmit={add}
         noValidate
@@ -525,33 +544,18 @@ function People({ onRemove }: { onRemove: (id: string) => void }) {
   );
 }
 
-/** Confirms removing a person, in place of the Settings content. */
-function RemovePerson({ id, onDone }: { id: string; onDone: () => void }) {
-  const [people] = usePeople();
+/** Confirms removing a person, inside the dialog People opens. */
+function RemovePerson({ person, onDone }: { person: Person; onDone: (removed: boolean) => void }) {
   const actions = useSettingsActions();
   const notify = useNotify();
   const [busy, setBusy] = useState(false);
-  if (people.state === "loading") return <SkeletonRows kind="line" count={1} label="Loading" />;
-  if (people.state !== "ready") return <Empty>Removing a person needs a connection.</Empty>;
-  const person = people.data.find((p) => p.id === id && !p.owner);
-  if (!person) {
-    return (
-      <>
-        <Empty>This person is no longer on the server.</Empty>
-        <DialogActions>
-          <Button onClick={onDone}>Back to People</Button>
-        </DialogActions>
-      </>
-    );
-  }
 
   async function remove() {
-    if (!person) return;
     setBusy(true);
     try {
       await actions.removePerson(person.id);
       notify({ title: `Removed ${person.username}`, icon: CheckIcon });
-      onDone();
+      onDone(true);
     } catch (err) {
       setBusy(false);
       if (err instanceof ActionError) notify({ title: err.message, icon: NoticeIcon });
@@ -561,16 +565,16 @@ function RemovePerson({ id, onDone }: { id: string; onDone: () => void }) {
 
   return (
     <>
-      <p className="text-[17px]">
-        <span className="font-semibold">{person.username}</span> can no longer log in, and their
-        planner moves to the server's removed folder. Moving it back undoes this.
+      <p className="text-muted-foreground">
+        They can no longer log in, and their planner moves to the server's removed folder. Moving it
+        back undoes this.
       </p>
       <DialogActions>
         <Button onClick={() => void remove()} disabled={busy}>
           {busy ? "Removing" : `Remove ${person.username}`}
         </Button>
         {/* Focus starts on Cancel, so a stray Enter does nothing drastic. */}
-        <Button variant="text" className="self-center" autoFocus onClick={onDone}>
+        <Button variant="text" className="self-center" autoFocus onClick={() => onDone(false)}>
           Cancel
         </Button>
       </DialogActions>
@@ -635,45 +639,86 @@ function About() {
   );
 }
 
-function Account({ onChange }: { onChange: (view: keyof typeof ACCOUNT_VIEWS) => void }) {
+const CHANGES = {
+  username: {
+    label: "Username",
+    title: "Change username",
+    description: "You will use the new username to log in on every device.",
+    Form: UsernameForm,
+    saved: "Username saved",
+  },
+  passphrase: {
+    label: "Passphrase",
+    title: "Change passphrase",
+    description: "Other devices will be logged out. This one stays logged in.",
+    Form: PassphraseForm,
+    saved: "Passphrase saved. Other devices were logged out.",
+  },
+} as const;
+
+type Change = keyof typeof CHANGES;
+
+function Account() {
   const { store } = useData();
   const today = useToday();
-  const [account] = useAccount();
+  const [account, reload] = useAccount();
+  const notify = useNotify();
+  // The dialog keeps showing what it was opened for while it closes.
+  const [what, setWhat] = useState<Change>("username");
+  const [open, setOpen] = useState(false);
   const info = account.state === "ready" ? account.data : null;
-  const username = info?.username ?? store.me?.username ?? "";
-
-  const row = (label: string, value: string, what: keyof typeof ACCOUNT_VIEWS) => (
-    <li className="flex min-h-16 items-center gap-3 border-t border-line py-2.5 first:border-t-0">
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-muted-foreground">{label}</p>
-        <p className="truncate text-[17px]">{value}</p>
-      </div>
-      <Button
-        variant="text"
-        aria-label={`Change ${what}`}
-        onClick={() => onChange(what)}
-        disabled={account.state === "offline"}
-      >
-        Change
-      </Button>
-    </li>
-  );
+  const values: Record<Change, string> = {
+    username: info?.username ?? store.me?.username ?? "Not loaded",
+    passphrase: info
+      ? `Changed ${changedOn(info.passphraseChangedAt, store.me?.tz ?? "UTC", today)}`
+      : "Set",
+  };
+  const change = CHANGES[what];
 
   return (
     <div>
       <ul>
-        {row("Username", username || "Not loaded", "username")}
-        {row(
-          "Passphrase",
-          info
-            ? `Changed ${changedOn(info.passphraseChangedAt, store.me?.tz ?? "UTC", today)}`
-            : "Set",
-          "passphrase",
-        )}
+        {(Object.keys(CHANGES) as Change[]).map((key) => (
+          <li
+            key={key}
+            className="flex min-h-16 items-center gap-3 border-t border-line py-2.5 first:border-t-0"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] text-muted-foreground">{CHANGES[key].label}</p>
+              <p className="truncate text-[17px]">{values[key]}</p>
+            </div>
+            <Button
+              variant="text"
+              aria-label={`Change ${key}`}
+              disabled={account.state === "offline"}
+              onClick={() => {
+                setWhat(key);
+                setOpen(true);
+              }}
+            >
+              Change
+            </Button>
+          </li>
+        ))}
       </ul>
       {account.state === "offline" && (
         <p className="mt-1 text-[13px] text-muted-foreground">Changing these needs a connection.</p>
       )}
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={change.title}
+        description={change.description}
+      >
+        <change.Form
+          key={what}
+          onClose={() => setOpen(false)}
+          onSaved={() => {
+            notify({ title: change.saved, icon: CheckIcon });
+            reload();
+          }}
+        />
+      </ResponsiveDialog>
     </div>
   );
 }

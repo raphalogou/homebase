@@ -15,7 +15,7 @@ import { Button } from "./ui/button";
 import { DialogActions } from "./ui/dialog";
 
 interface ChangeProps {
-  /** Back to the Settings view, after Cancel or a save. */
+  /** Closes the form, after Cancel or a save. */
   onClose: () => void;
   onSaved: (info: AccountInfo) => void;
 }
@@ -43,20 +43,8 @@ function serverMessage<F extends string>(
 
 // Views of the Settings modal. Each form mounts when its view opens, so
 // fields start empty and hidden each time.
-export const ACCOUNT_VIEWS = {
-  username: {
-    title: "Change username",
-    description: "You will use the new username to log in on every device.",
-    Form: UsernameForm,
-  },
-  passphrase: {
-    title: "Change passphrase",
-    description: "Other devices will be logged out. This one stays logged in.",
-    Form: PassphraseForm,
-  },
-} as const;
 
-function UsernameForm({ onClose, onSaved }: ChangeProps) {
+export function UsernameForm({ onClose, onSaved }: ChangeProps) {
   const actions = useSettingsActions();
   const [username, setUsername] = useState("");
   const [passphrase, setPassphrase] = useState("");

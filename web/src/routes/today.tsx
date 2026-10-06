@@ -159,21 +159,25 @@ function TodayBody() {
       )}
       <div className="mt-8 flex flex-wrap gap-x-5">
         {/* The phone's tab bar has four places; these are reached from here. */}
-        {!desktop &&
-          [
-            { name: "reminders", label: "Reminders", Icon: RemindersIcon },
-            { name: "settings", label: "Settings", Icon: SettingsIcon },
-          ].map(({ name, label, Icon }) => (
+        {!desktop && (
+          <>
             <button
-              key={name}
               type="button"
-              onClick={() => openModal(name)}
+              onClick={() => openModal("reminders")}
               className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
             >
-              <Icon size={20} />
-              {label}
+              <RemindersIcon size={20} />
+              Reminders
             </button>
-          ))}
+            <Link
+              to="/settings"
+              className="inline-flex min-h-11 items-center gap-2 px-1 font-semibold underline underline-offset-[3px]"
+            >
+              <SettingsIcon size={20} />
+              Settings
+            </Link>
+          </>
+        )}
         <InstallButton />
       </div>
     </>

@@ -2,7 +2,6 @@ import { Dialog } from "@base-ui/react/dialog";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Kbd } from "@/components/ui/kbd";
-import { useOpenModal } from "@/lib/modal";
 import { useOpenTask } from "@/lib/open-task";
 import { isTyping, SHORTCUTS, shortcutFor } from "@/lib/shortcuts";
 import { useIsDesktop } from "@/lib/use-media";
@@ -29,7 +28,6 @@ function focusCapture(tries = 10) {
 export function Shortcuts({ children }: { children: ReactNode }) {
   const desktop = useIsDesktop();
   const navigate = useNavigate();
-  const openModal = useOpenModal();
   const [taskId, openTask] = useOpenTask();
   const [open, setOpen] = useState(false);
 
@@ -63,7 +61,6 @@ export function Shortcuts({ children }: { children: ReactNode }) {
       e.preventDefault();
       if (s.kind === "help") setOpen(true);
       else if (s.kind === "go") navigate(s.to);
-      else if (s.kind === "modal") openModal(s.name);
       else if (document.querySelector("[data-capture]")) focusCapture(0);
       else {
         navigate("/");
@@ -72,7 +69,7 @@ export function Shortcuts({ children }: { children: ReactNode }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [desktop, navigate, openModal, taskId, openTask]);
+  }, [desktop, navigate, taskId, openTask]);
 
   return (
     <OpenShortcuts value={() => setOpen(true)}>

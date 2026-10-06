@@ -17,6 +17,7 @@ import Plan from "@/routes/plan";
 import PlanProjects from "@/routes/plan-projects";
 import ProjectScreen from "@/routes/project";
 import Review from "@/routes/review";
+import Settings from "@/routes/settings";
 import Setup from "@/routes/setup";
 import Today from "@/routes/today";
 
@@ -54,7 +55,8 @@ const router = createBrowserRouter([
           { path: "/goals/:id", element: <GoalScreen /> },
           { path: "/reminders", element: <Navigate to="/?reminders=1" replace /> },
           { path: "/review", element: <Review /> },
-          { path: "/settings", element: <Navigate to="/?settings=1" replace /> },
+          { path: "/settings", element: <Settings /> },
+          { path: "/settings/:section", element: <Settings /> },
           { path: "*", element: <Navigate to="/" replace /> },
         ],
       },
