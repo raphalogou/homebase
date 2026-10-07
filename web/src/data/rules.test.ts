@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  doneByDay,
   goalProgress,
   hasRoom,
   isInbox,
@@ -181,4 +182,27 @@ test("goalProgress counts tasks through projects and directly, without dropped o
     task({ goalId: "OTHER", status: "done" }),
   ];
   assert.deepEqual(goalProgress("G", tasks, projects), { done: 2, total: 3 });
+});
+
+test("the Done filter groups by the local day a task was finished, newest first", () => {
+  // 2026-03-04 00:30 in Paris is still 3 March in UTC.
+  const at = (iso: string) => Date.parse(iso);
+  const tasks = [
+    task({ id: "a", status: "done", doneAt: at("2026-03-03T23:30:00Z") }),
+    task({ id: "b", status: "done", doneAt: at("2026-03-04T09:00:00Z") }),
+    task({ id: "c", status: "done", doneAt: at("2026-03-02T10:00:00Z") }),
+    task({ id: "old", status: "done", doneAt: at("2026-01-10T10:00:00Z") }),
+    task({ id: "open", status: "open" }),
+    task({ id: "gone", status: "done", doneAt: at("2026-03-04T08:00:00Z"), deletedAt: 1 }),
+  ];
+  const { groups, older } = doneByDay(tasks, "Europe/Paris", today, 30);
+  assert.deepEqual(
+    groups.map((g) => [g.day, g.tasks.map((t) => t.id)]),
+    [
+      ["2026-03-04", ["b", "a"]],
+      ["2026-03-02", ["c"]],
+    ],
+  );
+  assert.equal(older, true);
+  assert.equal(doneByDay(tasks, "Europe/Paris", today, 60).older, false);
 });

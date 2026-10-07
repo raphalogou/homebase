@@ -180,6 +180,11 @@ Notes:
 - [x] A device that held someone else's planner empties itself before syncing the new person, so nothing crosses between accounts.
 - Verified: Go tests for each rule above; in headless Chromium against a copy of a v0.1.0 install (owner and a task), the move, the old cookie, adding Sam, Sam's first login and passphrase, Sam not seeing the owner's task, Sam without the People tab, removing Sam, at 390 and 1280 px.
 
+## After release: seeing done tasks (owner's request, 7 October 2026)
+
+- [x] Plan's Done filter: finished tasks by the day they were finished, the last 30 days at a time with "Show older". Done tasks without a project or goal were otherwise invisible once their day passed.
+- Verified: a unit test for the grouping (local day in the zone, newest first, deleted ones left out, "older" flag); in headless Chromium with seeded tasks finished today, yesterday, 3 and 40 days ago, at 1280 and 390 px.
+
 ## Known risks
 
 - Push needs HTTPS and an installed app on Android; test early on a real device.

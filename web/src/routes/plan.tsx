@@ -19,19 +19,24 @@ import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { WeekStrip } from "@/components/week-strip";
 import { ActionError, useActions, useTasks, useToday, useWeekStart } from "@/data/hooks";
-import { dayOf } from "@/data/rules";
+import { useData } from "@/data/provider";
+import { type DoneDay, dayOf, doneByDay } from "@/data/rules";
 import type { LocalDate, Task } from "@/data/types";
 import { addDays, dayHeading, isDate, longDate, startOfWeek } from "@/lib/dates";
 import { useIsDesktop } from "@/lib/use-media";
 
-type Filter = "all" | "week" | "standalone" | "repeating";
+type Filter = "all" | "week" | "standalone" | "repeating" | "done";
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "Everything" },
   { value: "week", label: "Due this week" },
   { value: "standalone", label: "Standalone" },
   { value: "repeating", label: "Repeating" },
+  { value: "done", label: "Done" },
 ];
+
+/** How many days of finished tasks Done shows at first, and adds with "Show older". */
+const DONE_DAYS = 30;
 
 interface Group {
   key: string;
@@ -46,6 +51,14 @@ export default function Plan() {
   const actions = useActions();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("all");
+  const [doneDays, setDoneDays] = useState(DONE_DAYS);
+  const { store } = useData();
+  const tz = store.me?.tz ?? "UTC";
+  const showDone = filter === "done";
+  const done = useMemo(
+    () => (showDone ? doneByDay(tasks, tz, today, doneDays) : null),
+    [showDone, tasks, tz, today, doneDays],
+  );
   const [adding, setAdding] = useState(false);
   const desktop = useIsDesktop();
   const [params, setParams] = useSearchParams();
@@ -137,9 +150,12 @@ export default function Plan() {
         ]}
         onChange={(v) => v === "projects" && navigate("/plan/projects")}
       />
-      <div className="mt-6">
-        <WeekStrip selected={day} onSelect={setDay} shortDays />
-      </div>
+      {/* The strip is for planning ahead, so Done leaves it out. */}
+      {!showDone && (
+        <div className="mt-6">
+          <WeekStrip selected={day} onSelect={setDay} shortDays />
+        </div>
+      )}
       <fieldset className="mt-4 -mx-6 flex min-w-0 gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none]">
         <legend className="sr-only">Show</legend>
         {FILTERS.map((f) => (
@@ -154,7 +170,7 @@ export default function Plan() {
         ))}
       </fieldset>
 
-      {day && (
+      {day && !showDone && (
         <div className="mt-6 flex items-baseline justify-between gap-4">
           <h2 className="text-[22px] font-bold">{longDate(day)}</h2>
           <Button variant="text" onClick={() => setDay(null)}>
@@ -164,19 +180,32 @@ export default function Plan() {
       )}
       <div className="mt-6">
         <FirstLoad what="tasks" skeleton={<SkeletonRows count={3} label="Loading your tasks" />}>
-          {groups.length === 0 && empty}
-          {groups.map((g) => (
-            <section key={g.key} aria-label={g.heading} className="mb-8">
-              <SectionLabel>{g.heading}</SectionLabel>
-              <ul>
-                {g.tasks.map((t) => (
-                  <li key={t.id}>
-                    <TaskRow task={t} onToggle={() => void actions.toggleDone(t.id)} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+          {done ? (
+            <DoneList
+              groups={done.groups}
+              older={done.older}
+              days={doneDays}
+              today={today}
+              onOlder={() => setDoneDays((d) => d + DONE_DAYS)}
+              onToggle={(id) => void actions.toggleDone(id)}
+            />
+          ) : (
+            <>
+              {groups.length === 0 && empty}
+              {groups.map((g) => (
+                <section key={g.key} aria-label={g.heading} className="mb-8">
+                  <SectionLabel>{g.heading}</SectionLabel>
+                  <ul>
+                    {g.tasks.map((t) => (
+                      <li key={t.id}>
+                        <TaskRow task={t} onToggle={() => void actions.toggleDone(t.id)} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </>
+          )}
         </FirstLoad>
       </div>
       {!desktop && (
@@ -188,6 +217,58 @@ export default function Plan() {
   );
 
   return <Columns main={main} side={<NewTaskForm />} />;
+}
+
+// Approved design: done tasks by the day they were finished, newest first,
+// the last 30 days at a time. No counts, so it reads as a record, not a score.
+function DoneList({
+  groups,
+  older,
+  days,
+  today,
+  onOlder,
+  onToggle,
+}: {
+  groups: DoneDay[];
+  older: boolean;
+  days: number;
+  today: LocalDate;
+  onOlder: () => void;
+  onToggle: (id: string) => void;
+}) {
+  const more = older && (
+    <Button variant="text" onClick={onOlder}>
+      Show older
+    </Button>
+  );
+  if (groups.length === 0) {
+    return (
+      <EmptyBlock title={`Nothing done in the last ${days} days.`}>
+        Tasks you finish show up here, with the day you finished them.
+        {more && <div className="mt-2">{more}</div>}
+      </EmptyBlock>
+    );
+  }
+  return (
+    <>
+      {groups.map((g) => (
+        <section key={g.day} aria-label={dayHeading(g.day, today)} className="mb-8">
+          <SectionLabel>{dayHeading(g.day, today)}</SectionLabel>
+          <ul>
+            {g.tasks.map((t) => (
+              <li key={t.id}>
+                <TaskRow task={t} onToggle={() => onToggle(t.id)} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      <div className="flex items-center gap-4 border-t border-line pt-4">
+        <p className="flex-1 text-[13px] text-muted-foreground">The last {days} days</p>
+        {more}
+      </div>
+    </>
+  );
 }
 
 function NewTaskForm({ onAdded }: { onAdded?: () => void }) {

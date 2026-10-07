@@ -1,7 +1,7 @@
 // Client copies of the rules in docs/SPEC.md section 5. The server decides;
 // these let the screens answer instantly and offline.
 
-import { addDays, daysBetween } from "../lib/dates.ts";
+import { addDays, daysBetween, todayIn } from "../lib/dates.ts";
 import type { Goal, LocalDate, Project, Task } from "./types.ts";
 
 export const MAX_PER_DAY = 3;
@@ -164,4 +164,39 @@ export function dayOf(t: Task): LocalDate | null {
 
 export function isOverdue(t: Task, today: LocalDate): boolean {
   return t.status === "open" && t.due !== null && daysBetween(today, t.due) < 0;
+}
+
+export interface DoneDay {
+  day: LocalDate;
+  tasks: Task[];
+}
+
+/**
+ * Plan's Done filter: tasks finished in the last `days` days up to today,
+ * by the local day they were finished in tz, newest first. `older` says
+ * whether any were finished before that, for "Show older".
+ */
+export function doneByDay(
+  tasks: Task[],
+  tz: string,
+  today: LocalDate,
+  days: number,
+): { groups: DoneDay[]; older: boolean } {
+  const from = addDays(today, -(days - 1));
+  const when = (t: Task) => t.doneAt ?? t.updatedAt;
+  const byDay = new Map<LocalDate, Task[]>();
+  let older = false;
+  for (const t of tasks) {
+    if (t.status !== "done" || t.deletedAt !== null) continue;
+    const day = todayIn(tz, when(t));
+    if (day < from) {
+      older = true;
+      continue;
+    }
+    byDay.set(day, [...(byDay.get(day) ?? []), t]);
+  }
+  const groups = [...byDay]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([day, list]) => ({ day, tasks: list.sort((a, b) => when(b) - when(a)) }));
+  return { groups, older };
 }
